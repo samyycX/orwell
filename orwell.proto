@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package orwell;
+
+enum PacketType {
+  Client_Null = 0;
+  Client_Error = 1;
+  Client_Information = 2;
+  Client_Hello = 3;
+  Client_PreLogin = 4;
+  Client_Register = 5;
+  Client_Login = 6;
+  Client_Message = 7;
+  Client_ChangeColor = 8;
+
+  Server_Null = 10000;
+  Server_Error = 10001;
+  Server_Information = 10002;
+  Server_Hello = 10003;
+  Server_PreLogin = 10004;
+  Server_RegisterResponse = 10005;
+  Server_LoginResponse = 10006;
+  Server_OtherClientPk = 10007;
+  Server_BroadcastMessage = 10008;
+  Server_HistoryMessage = 10009;
+  Server_ChangeColorResponse = 10010;
+}
+
+enum MessageType {
+  Text = 0;
+  Login = 1;
+  Logout = 2;
+  ChangeColor = 3;
+}
+
+message Profile {
+  string name = 1;
+  bytes kyber_pk = 2;
+  bytes kyber_sk = 3;
+  bytes dilithium_pk = 4;
+  bytes dilithium_sk = 5;
+}
+
+message OrwellPacket {
+  uint64 timestamp = 1;
+  bytes salt = 2;
+  PacketType packet_type = 3;
+  bytes data = 4;
+}
+
+message OrwellSignedPacket {
+  OrwellPacket data = 1;
+  bytes sign = 2;
+}
+
+message ClientError {
+  string error = 1;
+}
+
+message ClientInformation {
+  string information = 1;
+}
+
+message ClientHello {
+  bytes pk = 1;
+}
+
+message ClientPreLogin {
+  bytes dilithium_pk = 1;
+}
+
+message ClientRegister {
+  string name = 1;
+  bytes kyber_pk = 2;
+  bytes dilithium_pk = 3;
+}
+
+message ClientLogin {
+  bytes token_sign = 1;
+}
+
+message Message {
+  string id = 1;
+  MessageType msg_type = 2;
+  bytes ciphertext = 3;
+  uint64 timestamp = 4;
+}
+
+message ClientMessage {
+  repeated Message data = 1;
+}
+
+message ClientChangeColor {
+  int32 color = 1;
+}
+
+message ServerError {
+  string error = 1;
+}
+
+message ServerInformation {
+  repeated ServerOtherClientPk other_clients_pk = 1;
+}
+
+message ServerHello {
+  bytes ciphertext = 1;
+  bytes dilithium_pk = 2;
+}
+
+message ServerPreLogin {
+  bool registered = 1;
+  bool can_register = 2;
+  optional bytes token = 3;
+}
+
+message ServerRegisterResponse {
+  bool success = 1;
+  optional int32 color = 2;
+  optional ServerInformation information = 3;
+  optional string message = 4;
+}
+
+message ServerLoginResponse {
+  bool success = 1;
+  optional ServerInformation information = 2;
+  optional string message = 3;
+}
+
+message ServerOtherClientPk {
+  string id = 1;
+  bytes kyber_pk = 2;
+}
+
+message ServerBroadcastMessage {
+  string sender_id = 1;
+  string sender_name = 2;
+  int32 color = 3;
+  Message data = 4;
+}
+
+message ServerBroadcastClientLogin {
+  string sender_id = 1;
+  string sender_name = 2;
+  int32 color = 3;
+}
+
+message ServerBroadcastClientLogout {
+  string sender_id = 1;
+  string sender_name = 2;
+  int32 color = 3;
+}
+
+message ServerHistoryMessage {
+  repeated ServerBroadcastMessage data = 1;
+}
+
+message ServerChangeColorResponse {
+  bool success = 1;
+  optional int32 color = 2;
+  optional string message = 3;
+}
+
+message ServerBroadcastChangeColor {
+  string name = 1;
+  int32 old_color = 2;
+  int32 new_color = 3;
+}
