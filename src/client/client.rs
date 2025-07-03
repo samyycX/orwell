@@ -489,15 +489,15 @@ fn render(frame: &mut Frame, app: &mut App) {
                 Style::default().fg(Theme::catppuccin().lavender),
             )]),
             RatatuiLine::from(vec![Span::styled(
-                format!(" \u{eae8} {}B", state.processed_bytes),
+                format!(" \u{eae8} {} B", state.processed_bytes),
                 Style::default().fg(Theme::catppuccin().lavender),
             )]),
             RatatuiLine::from(vec![Span::styled(
-                format!(" \u{f013} 棘轮转动{}次", state.ratchet_roll_time),
+                format!(" \u{f013} 棘轮转动 {} 次", state.ratchet_roll_time),
                 Style::default().fg(Theme::catppuccin().lavender),
             )]),
             RatatuiLine::from(vec![Span::styled(
-                format!(" \u{f013} 在线时长 {}", Service::get_online_time()),
+                format!(" \u{f199f} {}", Service::get_online_time(state.start_time)),
                 Style::default().fg(Theme::catppuccin().lavender),
             )]),
             RatatuiLine::from(vec![]),

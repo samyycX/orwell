@@ -366,6 +366,9 @@ impl Service {
     }
 
     pub fn handle_packet(packet: OrwellPacket, network: &mut Network) -> Result<()> {
+        let mut state = STATE.write().unwrap();
+        state.ratchet_roll_time += 1;
+        drop(state);
         let type_ = PacketType::try_from(packet.packet_type);
         if type_.is_err() {
             return Err(anyhow::anyhow!("收到未知消息类型"));
@@ -420,6 +423,7 @@ impl Service {
                     let mut state = STATE.write().unwrap();
                     state.connected = true;
                     state.start_time = get_now_timestamp();
+                    drop(state);
                 } else {
                     add_chat_message(format!("注册失败, 原因: {}", packet.message.unwrap()));
                 }
@@ -431,6 +435,7 @@ impl Service {
                     let mut state = STATE.write().unwrap();
                     state.connected = true;
                     state.start_time = get_now_timestamp();
+                    drop(state);
                 } else {
                     add_chat_message(format!("登录失败, 原因: {}", packet.message.unwrap()));
                 }
@@ -533,12 +538,15 @@ impl Service {
         Ok((result, data))
     }
 
-    pub fn get_online_time() -> String {
-        let state = STATE.read().unwrap();
-        let seconds = get_now_timestamp() - state.start_time;
-        let hours = seconds / 3600;
-        let minutes = (seconds % 3600) / 60;
-        let secs = seconds % 60;
-        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+    pub fn get_online_time(start_time: u64) -> String {
+        let milliseconds = get_now_timestamp() - start_time;
+        let hours = milliseconds / 3600000;
+        let minutes = (milliseconds % 3600000) / 60000;
+        let secs = (milliseconds % 60000) / 1000;
+        let milliseconds = milliseconds % 1000;
+        format!(
+            "{:02}:{:02}:{:02}.{:03}",
+            hours, minutes, secs, milliseconds
+        )
     }
 }
