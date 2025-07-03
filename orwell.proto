@@ -3,7 +3,7 @@ syntax = "proto3";
 package orwell;
 
 enum PacketType {
-  Client_Null = 0;
+  Client_Heartbeat = 0;
   Client_Error = 1;
   Client_Information = 2;
   Client_Hello = 3;
@@ -12,18 +12,35 @@ enum PacketType {
   Client_Login = 6;
   Client_Message = 7;
   Client_ChangeColor = 8;
+  Client_Afk = 9;
 
-  Server_Null = 10000;
+  Server_Heartbeat = 10000;
   Server_Error = 10001;
   Server_Information = 10002;
   Server_Hello = 10003;
   Server_PreLogin = 10004;
   Server_RegisterResponse = 10005;
   Server_LoginResponse = 10006;
-  Server_OtherClientPk = 10007;
+  Server_ClientInfo = 10007;
   Server_BroadcastMessage = 10008;
   Server_HistoryMessage = 10009;
   Server_ChangeColorResponse = 10010;
+  Server_OrwellRatchetStep = 10011;
+}
+
+enum ClientStatus {
+  Online = 0;
+  Offline = 1;
+  Afk = 2;
+}
+
+
+message ClientInfo {
+  string id = 1;
+  string name = 2;
+  uint32 color = 3;
+  bytes kyber_pk = 4;
+  ClientStatus status = 5;
 }
 
 enum MessageType {
@@ -31,6 +48,9 @@ enum MessageType {
   Login = 1;
   Logout = 2;
   ChangeColor = 3;
+  Me = 4;
+  EnterAfk = 5;
+  LeftAfk = 6;
 }
 
 message Profile {
@@ -39,6 +59,13 @@ message Profile {
   bytes kyber_sk = 3;
   bytes dilithium_pk = 4;
   bytes dilithium_sk = 5;
+}
+
+message OrwellRatchetPacket {
+  bytes kyber_pk = 1;
+  uint64 send_counter = 2;
+  uint64 recv_counter = 3;
+  bytes data = 4;
 }
 
 message OrwellPacket {
@@ -53,6 +80,9 @@ message OrwellSignedPacket {
   bytes sign = 2;
 }
 
+message ClientHeartbeat {
+}
+
 message ClientError {
   string error = 1;
 }
@@ -65,8 +95,13 @@ message ClientHello {
   bytes pk = 1;
 }
 
+message ClientHello2 {
+  bytes ciphertext = 1;
+}
+
 message ClientPreLogin {
   bytes dilithium_pk = 1;
+  uint64 version = 2;
 }
 
 message ClientRegister {
@@ -79,19 +114,26 @@ message ClientLogin {
   bytes token_sign = 1;
 }
 
-message Message {
-  string id = 1;
-  MessageType msg_type = 2;
-  bytes ciphertext = 3;
-  uint64 timestamp = 4;
+message Key {
+  string receiver_id = 1;
+  bytes ciphertext = 2;
 }
 
 message ClientMessage {
-  repeated Message data = 1;
+  repeated Key keys = 1;
+  bytes data = 2;
 }
 
 message ClientChangeColor {
   int32 color = 1;
+}
+
+message ClientAfk {
+
+}
+
+message ServerHeartbeat {
+  
 }
 
 message ServerError {
@@ -99,43 +141,44 @@ message ServerError {
 }
 
 message ServerInformation {
-  repeated ServerOtherClientPk other_clients_pk = 1;
 }
+
 
 message ServerHello {
   bytes ciphertext = 1;
-  bytes dilithium_pk = 2;
+  bytes pk = 2;
+  bytes dilithium_pk = 3;
 }
 
 message ServerPreLogin {
   bool registered = 1;
   bool can_register = 2;
   optional bytes token = 3;
+  bool version_mismatch = 4;
 }
 
 message ServerRegisterResponse {
   bool success = 1;
   optional int32 color = 2;
-  optional ServerInformation information = 3;
-  optional string message = 4;
+  optional string message = 3;
 }
 
 message ServerLoginResponse {
   bool success = 1;
-  optional ServerInformation information = 2;
-  optional string message = 3;
+  optional string message = 2;
 }
 
-message ServerOtherClientPk {
-  string id = 1;
-  bytes kyber_pk = 2;
+message ServerClientInfo {
+  repeated ClientInfo data = 1;
 }
 
 message ServerBroadcastMessage {
   string sender_id = 1;
   string sender_name = 2;
   int32 color = 3;
-  Message data = 4;
+  Key key = 4;
+  bytes data = 5;
+  uint64 timestamp = 6;
 }
 
 message ServerBroadcastClientLogin {
@@ -161,7 +204,12 @@ message ServerChangeColorResponse {
 }
 
 message ServerBroadcastChangeColor {
-  string name = 1;
-  int32 old_color = 2;
-  int32 new_color = 3;
+  string id = 1;
+  string name = 2;
+  int32 old_color = 3;
+  int32 new_color = 4;
+}
+
+message OrwellRatchetStep {
+  bytes ct = 1;
 }

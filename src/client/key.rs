@@ -112,6 +112,7 @@ impl KeyManager {
                 MessageLevel::Info,
                 format!("检测到配置的服务器地址 {}，尝试自动连接", url),
             );
+
             Network::start(url);
         }
     }

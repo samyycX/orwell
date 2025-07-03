@@ -4,6 +4,8 @@ use orwell::shared::helper::get_now_timestamp;
 use ratatui::style::{Color, Style};
 use std::sync::Mutex;
 
+use crate::notify::Notifier;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageLevel {
     Info,
@@ -120,13 +122,13 @@ impl Line {
 
     /// Format timestamp based on the given format
     pub fn format_timestamp(&self, format: TimeFormat) -> String {
-        let datetime = chrono::DateTime::from_timestamp(self.timestamp as i64, 0)
+        let datetime = chrono::DateTime::from_timestamp_millis(self.timestamp as i64)
             .unwrap_or_else(|| chrono::Utc::now().into());
-        let local_time = datetime.with_timezone(&chrono::Local);
+        let utc8_time = datetime.with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap());
 
         match format {
-            TimeFormat::Short => local_time.format("%m/%d %H:%M").to_string(),
-            TimeFormat::Full => local_time.format("%Y/%m/%d %H:%M:%S").to_string(),
+            TimeFormat::Short => utc8_time.format("%m/%d %H:%M").to_string(),
+            TimeFormat::Full => utc8_time.format("%Y/%m/%d %H:%M:%S.%3f").to_string(),
         }
     }
 
@@ -141,6 +143,8 @@ impl Line {
         sender_width = match self.sender.content() {
             "→" => 1,
             "←" => 1,
+            "\u{f04b2}" => 1,
+            "\u{f04b3}" => 1,
             _ => sender_width,
         };
 
@@ -274,6 +278,9 @@ impl MessageManager {
     pub fn add_debug_message(&mut self, level: MessageLevel, message: String) {
         let debug_message = DebugMessage::new(level, message);
         self.debug_messages.push(debug_message);
+        if self.debug_messages.len() > 500 {
+            self.debug_messages.remove(0);
+        }
     }
 
     pub fn get_chat_messages(&self) -> &[Line] {
@@ -298,6 +305,7 @@ impl MessageManager {
 /// Add a chat message with rich text support
 pub fn add_chat_message_rich(line: Line, index: Option<usize>) {
     if let Ok(mut manager) = MESSAGE_MANAGER.lock() {
+        // Notifier::flash_window();
         if let Some(index) = index {
             manager.insert_chat_message(index, line);
         } else {

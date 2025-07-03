@@ -2,6 +2,10 @@ use std::{sync::RwLock, thread, time::Duration};
 
 use anyhow::Result;
 use lazy_static::lazy_static;
+use orwell::{
+    pb::orwell::ClientStatus,
+    shared::helper::{get_hash_version, get_version},
+};
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     layout::{Constraint, Layout},
@@ -13,8 +17,6 @@ use ratatui::{
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::theme::THEME;
-use crate::widgets::MultiInput;
 use crate::{
     message::{
         add_chat_message, add_debug_message, calculate_optimal_prefix_width, get_chat_messages,
@@ -22,11 +24,14 @@ use crate::{
     },
     service::Service,
 };
+use crate::{service::ClientManager, theme::THEME};
+use crate::{theme::Theme, widgets::MultiInput};
 
 mod config;
 mod key;
 mod message;
 mod network;
+mod notify;
 mod service;
 mod theme;
 mod widgets;
@@ -35,8 +40,8 @@ mod widgets;
 enum Page {
     Chat,
 }
-
 struct State {
+    server_url: String,
     logged: bool,
     connected: bool,
     processing: bool,
@@ -150,6 +155,7 @@ fn main() -> Result<()> {
 lazy_static! {
     static ref APP: RwLock<Option<App>> = RwLock::new(None);
     static ref STATE: RwLock<State> = RwLock::new(State {
+        server_url: "".to_string(),
         logged: false,
         connected: false,
         processing: false,
@@ -163,6 +169,7 @@ fn run(mut terminal: DefaultTerminal) -> Result<()> {
     }
     let mut app = app_guard.as_mut().unwrap();
     add_chat_message("W3LC0ME T0 0RW3LL");
+    add_chat_message(format!("VERSION={}", get_hash_version()));
     Service::check_login(&app);
 
     loop {
@@ -211,7 +218,10 @@ fn render(frame: &mut Frame, app: &mut App) {
     frame.render_widget(widget, title_area);
 
     let horizontal = Layout::horizontal([Constraint::Percentage(80), Constraint::Percentage(20)]);
-    let [chat_area, debug_area] = horizontal.areas(main_area);
+    let [chat_area, right_area] = horizontal.areas(main_area);
+
+    let vertical = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]);
+    let [state_area, debug_area] = vertical.areas(right_area);
 
     // Chat area layout
     let chat_layout = Layout::vertical([Constraint::Min(0), Constraint::Length(6)]);
@@ -228,14 +238,62 @@ fn render(frame: &mut Frame, app: &mut App) {
     let time_format = get_time_format();
 
     for msg in &chat_messages {
-        // For each Line, we need to wrap it if it's too long
-        let mut current_width = 0;
-        let mut current_spans: Vec<Span> = Vec::new();
+        // Get formatted spans with fixed-width prefix
+        let formatted_spans = msg.formatted_spans(prefix_width, time_format);
 
-        // Use formatted spans with fixed-width prefix
-        for span in msg.formatted_spans(prefix_width, time_format) {
-            let content_string = span.content().to_string();
-            let style = span.style();
+        // Separate prefix spans from content spans
+        let mut prefix_spans = Vec::new();
+        let mut content_spans = Vec::new();
+        let mut prefix_complete = false;
+
+        for span in formatted_spans {
+            let content_str = span.content().to_string();
+            let span_style = span.style();
+
+            if !prefix_complete && content_str.contains(" | ") {
+                // This is the last prefix span, split it
+                if let Some(pipe_pos) = content_str.find(" | ") {
+                    let prefix_part = &content_str[..pipe_pos + 3]; // Include " | "
+                    let content_part = &content_str[pipe_pos + 3..];
+
+                    prefix_spans.push(Span::styled(prefix_part.to_string(), span_style));
+                    if !content_part.is_empty() {
+                        content_spans.push(Span::styled(content_part.to_string(), span_style));
+                    }
+                    prefix_complete = true;
+                }
+            } else if !prefix_complete {
+                prefix_spans.push(Span::styled(content_str, span_style));
+            } else {
+                content_spans.push(Span::styled(content_str, span_style));
+            }
+        }
+
+        // Calculate prefix width for continuation lines
+        let prefix_text_width = prefix_spans
+            .iter()
+            .map(|span| UnicodeWidthStr::width(span.content.as_ref()))
+            .sum::<usize>();
+
+        // Calculate time span width (first span should be the timestamp)
+        let time_span_width = if !prefix_spans.is_empty() {
+            UnicodeWidthStr::width(prefix_spans[0].content.as_ref())
+        } else {
+            0
+        };
+
+        // Calculate how much padding needed after timestamp for continuation lines
+        let continuation_padding_width = prefix_text_width.saturating_sub(time_span_width + 3); // -3 for " | "
+        let continuation_padding = " ".repeat(continuation_padding_width);
+
+        // Process content spans with wrapping
+        let mut current_line_spans = prefix_spans.clone();
+        let mut current_width = prefix_text_width;
+        let mut is_first_line = true;
+
+        for span in content_spans {
+            let content_string = span.content.to_string();
+            let style = span.style;
 
             // Process each grapheme in the span
             for grapheme in content_string.graphemes(true) {
@@ -243,15 +301,29 @@ fn render(frame: &mut Frame, app: &mut App) {
 
                 if current_width + grapheme_width > area_width {
                     // Need to wrap - push current line and start new one
-                    if !current_spans.is_empty() {
-                        ratatui_lines.push(RatatuiLine::from(current_spans));
-                        current_spans = Vec::new();
-                        current_width = 0;
+                    if !current_line_spans.is_empty() {
+                        ratatui_lines.push(RatatuiLine::from(current_line_spans.clone()));
                     }
+
+                    // Start new line with continuation prefix (timestamp + padding + |)
+                    current_line_spans = if !prefix_spans.is_empty() {
+                        vec![
+                            prefix_spans[0].clone(), // Keep the timestamp
+                            Span::styled(continuation_padding.clone(), Style::default()),
+                            Span::styled(" | ", Style::default()),
+                        ]
+                    } else {
+                        vec![
+                            Span::styled(" ".repeat(prefix_text_width), Style::default()),
+                            Span::styled(" | ", Style::default()),
+                        ]
+                    };
+                    current_width = prefix_text_width; // Reset to the base prefix width
+                    is_first_line = false;
                 }
 
                 // Add grapheme to current span
-                if let Some(last_span) = current_spans.last_mut() {
+                if let Some(last_span) = current_line_spans.last_mut() {
                     if last_span.style == style {
                         // Extend existing span with same style
                         let mut new_content = last_span.content.to_string();
@@ -259,11 +331,11 @@ fn render(frame: &mut Frame, app: &mut App) {
                         *last_span = Span::styled(new_content, style);
                     } else {
                         // Different style, create new span
-                        current_spans.push(Span::styled(grapheme.to_string(), style));
+                        current_line_spans.push(Span::styled(grapheme.to_string(), style));
                     }
                 } else {
                     // First span on line
-                    current_spans.push(Span::styled(grapheme.to_string(), style));
+                    current_line_spans.push(Span::styled(grapheme.to_string(), style));
                 }
 
                 current_width += grapheme_width;
@@ -271,8 +343,8 @@ fn render(frame: &mut Frame, app: &mut App) {
         }
 
         // Add the last line if it has content
-        if !current_spans.is_empty() {
-            ratatui_lines.push(RatatuiLine::from(current_spans));
+        if !current_line_spans.is_empty() {
+            ratatui_lines.push(RatatuiLine::from(current_line_spans));
         }
     }
 
@@ -397,4 +469,69 @@ fn render(frame: &mut Frame, app: &mut App) {
         )
         .scroll((scroll_offset, 0));
     frame.render_widget(debug_widget, debug_area);
+
+    if state.connected {
+        let state_block = Block::default()
+            .title("State")
+            .borders(Borders::ALL)
+            .border_style(THEME.border_style())
+            .style(THEME.message_style());
+
+        let mut state_text = vec![
+            RatatuiLine::from(vec![Span::styled(
+                format!(" \u{eb50} {}", state.server_url),
+                Style::default().fg(Theme::catppuccin().lavender),
+            )]),
+            RatatuiLine::from(vec![]),
+            RatatuiLine::from(vec![Span::styled(
+                format!(
+                    "用户列表 ({}/{})",
+                    ClientManager::get_all_clients()
+                        .iter()
+                        .filter(|c| c.status == ClientStatus::Online)
+                        .count(),
+                    ClientManager::get_all_clients().len(),
+                ),
+                Style::default().fg(Theme::catppuccin().lavender),
+            )]),
+        ];
+
+        ClientManager::get_all_clients_sorted()
+            .iter()
+            .for_each(|client| {
+                state_text.push(RatatuiLine::from(vec![
+                    Span::styled(
+                        format!("\u{f1eb} "),
+                        Style::default().fg(match client.status {
+                            ClientStatus::Online => Theme::catppuccin().green,
+                            ClientStatus::Offline => Theme::catppuccin().red,
+                            ClientStatus::Afk => Theme::catppuccin().yellow,
+                        }),
+                    ),
+                    Span::styled(
+                        format!("{}", client.name),
+                        Style::default().fg(Theme::catppuccin().lavender),
+                    ),
+                ]));
+            });
+        let state_widget = Paragraph::new(state_text)
+            .block(state_block)
+            .wrap(Wrap { trim: true });
+
+        frame.render_widget(state_widget, state_area);
+    } else {
+        let state_block = Block::default()
+            .title("State")
+            .borders(Borders::ALL)
+            .border_style(THEME.border_style())
+            .style(THEME.message_style());
+        let state_widget = Paragraph::new(vec![RatatuiLine::from(vec![Span::styled(
+            "未连接",
+            Style::default().fg(Theme::catppuccin().lavender),
+        )])])
+        .block(state_block)
+        .wrap(Wrap { trim: true });
+
+        frame.render_widget(state_widget, state_area);
+    }
 }

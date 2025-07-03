@@ -12,15 +12,25 @@ diesel::table! {
 }
 
 diesel::table! {
-    messages_ (unique_id_) {
-        unique_id_ -> Text,
+    message_keys_ (id_) {
+        id_ -> Text,
         msg_id_ -> Text,
-        msg_type_ -> Integer,
-        sender_id_ -> Text,
         receiver_id_ -> Text,
         data_ -> Binary,
-        timestamp_ -> BigInt
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(clients_, messages_,);
+diesel::table! {
+    messages_ (id_) {
+        id_ -> Text,
+        sender_id_ -> Text,
+        data_ -> Binary,
+        timestamp_ -> BigInt,
+    }
+}
+
+diesel::allow_tables_to_appear_in_same_query!(
+    clients_,
+    message_keys_,
+    messages_,
+);
