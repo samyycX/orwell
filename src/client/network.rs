@@ -55,7 +55,7 @@ impl Network {
         let mut state = STATE.write().unwrap();
         state.server_url = server_url.clone();
 
-        let server_url = format!("ws://{}", server_url);
+        let server_url = format!("wss://{}", server_url);
         let (msg_tx, msg_rx) = mpsc::channel();
         let (cmd_tx, mut cmd_rx) = async_mpsc::unbounded_channel();
 
@@ -102,6 +102,8 @@ impl Network {
                                 }
 
                                 if let Ok(_) = result {
+                                    let mut state = STATE.write().unwrap();
+                                    state.processed_bytes += raw.len() as u64;
                                     add_debug_message(
                                         MessageLevel::Info,
                                         format!("↑ {:?} Bytes", raw.len()),
@@ -139,6 +141,8 @@ impl Network {
         let msg_thread = thread::spawn(move || {
             while let Ok(data) = msg_rx.recv() {
                 add_debug_message(MessageLevel::Info, format!("↓ {:?} Bytes", data.len()));
+                let mut state = STATE.write().unwrap();
+                state.processed_bytes += data.len() as u64;
                 let mut network_guard = NETWORK.write().unwrap();
                 if let Some(network) = network_guard.as_mut() {
                     if let Err(e) = network.on_message(data) {
@@ -263,6 +267,8 @@ impl Network {
     }
 
     pub fn ratchet_step(&mut self, ct: Vec<u8>) -> Result<()> {
+        let mut state = STATE.write().unwrap();
+        state.ratchet_roll_time += 1;
         let ct = Ciphertext::from_bytes(&ct)?;
         let shared_secret = kyber1024_decapsulate(&ct, &self.ratchet.as_ref().unwrap().kyber_sk);
         self.ratchet

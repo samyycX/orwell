@@ -419,6 +419,7 @@ impl Service {
                     ));
                     let mut state = STATE.write().unwrap();
                     state.connected = true;
+                    state.start_time = get_now_timestamp();
                 } else {
                     add_chat_message(format!("注册失败, 原因: {}", packet.message.unwrap()));
                 }
@@ -429,6 +430,7 @@ impl Service {
                     add_chat_message("登录成功");
                     let mut state = STATE.write().unwrap();
                     state.connected = true;
+                    state.start_time = get_now_timestamp();
                 } else {
                     add_chat_message(format!("登录失败, 原因: {}", packet.message.unwrap()));
                 }
@@ -529,5 +531,14 @@ impl Service {
         }
 
         Ok((result, data))
+    }
+
+    pub fn get_online_time() -> String {
+        let state = STATE.read().unwrap();
+        let seconds = get_now_timestamp() - state.start_time;
+        let hours = seconds / 3600;
+        let minutes = (seconds % 3600) / 60;
+        let secs = seconds % 60;
+        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
     }
 }
