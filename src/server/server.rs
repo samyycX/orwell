@@ -590,27 +590,6 @@ async fn main() -> Result<()> {
 
     let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(config));
 
-    while let Ok((stream, addr)) = listener.accept().await {
-        let stream_tcp_tls = acceptor.accept(stream).await;
-        if stream_tcp_tls.is_err() {
-            warn!(
-                "Failed to accept connection from {}: {:?}",
-                addr,
-                stream_tcp_tls.err()
-            );
-            continue;
-        }
-        let stream_tcp_tls = stream_tcp_tls.unwrap();
-        match tokio_tungstenite::accept_async(stream_tcp_tls).await {
-            Ok(ws_stream) => {
-                tokio::spawn(handle_connection_with_error(ws_stream, addr));
-            }
-            Err(e) => {
-                warn!("Failed to accept connection from {}: {:?}", addr, e);
-            }
-        };
-    }
-
     tracing_subscriber::fmt::init();
 
     // heartbeat
@@ -641,6 +620,27 @@ async fn main() -> Result<()> {
             tokio::time::sleep(Duration::from_millis(random_sleep_time)).await;
         }
     });
+
+    while let Ok((stream, addr)) = listener.accept().await {
+        let stream_tcp_tls = acceptor.accept(stream).await;
+        if stream_tcp_tls.is_err() {
+            warn!(
+                "Failed to accept connection from {}: {:?}",
+                addr,
+                stream_tcp_tls.err()
+            );
+            continue;
+        }
+        let stream_tcp_tls = stream_tcp_tls.unwrap();
+        match tokio_tungstenite::accept_async(stream_tcp_tls).await {
+            Ok(ws_stream) => {
+                tokio::spawn(handle_connection_with_error(ws_stream, addr));
+            }
+            Err(e) => {
+                warn!("Failed to accept connection from {}: {:?}", addr, e);
+            }
+        };
+    }
 
     Ok(())
 }

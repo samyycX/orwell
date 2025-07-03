@@ -54,6 +54,7 @@ impl Network {
     pub fn start(server_url: String) {
         let mut state = STATE.write().unwrap();
         state.server_url = server_url.clone();
+        drop(state);
 
         let server_url = format!("wss://{}", server_url);
         let (msg_tx, msg_rx) = mpsc::channel();
@@ -104,6 +105,7 @@ impl Network {
                                 if let Ok(_) = result {
                                     let mut state = STATE.write().unwrap();
                                     state.processed_bytes += raw.len() as u64;
+                                    drop(state);
                                     add_debug_message(
                                         MessageLevel::Info,
                                         format!("↑ {:?} Bytes", raw.len()),
@@ -143,6 +145,7 @@ impl Network {
                 add_debug_message(MessageLevel::Info, format!("↓ {:?} Bytes", data.len()));
                 let mut state = STATE.write().unwrap();
                 state.processed_bytes += data.len() as u64;
+                drop(state);
                 let mut network_guard = NETWORK.write().unwrap();
                 if let Some(network) = network_guard.as_mut() {
                     if let Err(e) = network.on_message(data) {
@@ -249,6 +252,9 @@ impl Network {
     }
 
     pub fn send_packet<T: prost::Message>(&mut self, packet_type: PacketType, packet: T) {
+        let mut state = STATE.write().unwrap();
+        state.ratchet_roll_time += 1;
+        drop(state);
         match Encryption::encrypt_packet(
             packet_type,
             packet,
@@ -267,8 +273,6 @@ impl Network {
     }
 
     pub fn ratchet_step(&mut self, ct: Vec<u8>) -> Result<()> {
-        let mut state = STATE.write().unwrap();
-        state.ratchet_roll_time += 1;
         let ct = Ciphertext::from_bytes(&ct)?;
         let shared_secret = kyber1024_decapsulate(&ct, &self.ratchet.as_ref().unwrap().kyber_sk);
         self.ratchet
