@@ -3,36 +3,36 @@ use ratatui::style::{Color, Style};
 
 pub struct Theme {
     // Base colors
-    base: Color,     // Base background
-    mantle: Color,   // Slightly lighter background
-    crust: Color,    // Darker background
-    surface0: Color, // Surface color for input
-    surface1: Color, // Surface color for messages
+    pub base: Color,     // Base background
+    pub mantle: Color,   // Slightly lighter background
+    pub crust: Color,    // Darker background
+    pub surface0: Color, // Surface color for input
+    pub surface1: Color, // Surface color for messages
 
     // Text colors
-    text: Color,     // Primary text
-    subtext0: Color, // Secondary text
-    subtext1: Color, // Tertiary text
+    pub text: Color,     // Primary text
+    pub subtext0: Color, // Secondary text
+    pub subtext1: Color, // Tertiary text
 
     // Accent colors
-    rosewater: Color, // Accent 1
-    flamingo: Color,  // Accent 2
-    pink: Color,      // Accent 3
-    mauve: Color,     // Accent 4
-    red: Color,       // Error
-    maroon: Color,    // Warning
-    peach: Color,     // Highlight
-    yellow: Color,    // Attention
-    green: Color,     // Success
-    teal: Color,      // Info
-    sky: Color,       // Link
-    sapphire: Color,  // Border
-    blue: Color,      // Primary
-    lavender: Color,  // Secondary
+    pub rosewater: Color, // Accent 1
+    pub flamingo: Color,  // Accent 2
+    pub pink: Color,      // Accent 3
+    pub mauve: Color,     // Accent 4
+    pub red: Color,       // Error
+    pub maroon: Color,    // Warning
+    pub peach: Color,     // Highlight
+    pub yellow: Color,    // Attention
+    pub green: Color,     // Success
+    pub teal: Color,      // Info
+    pub sky: Color,       // Link
+    pub sapphire: Color,  // Border
+    pub blue: Color,      // Primary
+    pub lavender: Color,  // Secondary
 }
 
 impl Theme {
-    fn catppuccin() -> Self {
+    pub fn catppuccin() -> Self {
         Self {
             // Base colors
             base: Color::Rgb(24, 24, 37),     // #1e1e2e

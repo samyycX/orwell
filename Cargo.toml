@@ -48,6 +48,11 @@ tracing-subscriber = "0.3.19"
 uuid = { version = "1.17.0", features = [ "v7" ] }
 hkdf = "0.12.4"
 configparser = "3.1"
+winapi = "0.3.9"
+notify-rust = "4.11.7"
+rustls = "0.23.28"
+rustls-pemfile = "2.2.0"
+tokio-rustls = "0.26.2"
 
 [build-dependencies]
 prost-build = "0.13.5"

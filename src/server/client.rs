@@ -2,13 +2,17 @@ use std::{collections::HashMap, sync::Arc};
 
 use diesel::prelude::*;
 use lazy_static::lazy_static;
-use orwell::schema::clients_::{self, dsl::*};
+use orwell::{
+    pb::orwell::{ClientInfo as PbClientInfo, ClientStatus},
+    schema::clients_::{self, dsl::*},
+};
 use tokio::sync::RwLock;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::get_db_connection;
 
-#[derive(Queryable, Selectable, Insertable, Clone)]
+#[derive(Queryable, Selectable, Insertable, Clone, Debug)]
 #[diesel(table_name = clients_)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[diesel(primary_key(id_))]
@@ -19,6 +23,12 @@ pub struct Client {
     pub dilithium_pk_: Vec<u8>,
     pub online_time_: i64,
     pub color_: i32,
+}
+
+impl PartialEq for Client {
+    fn eq(&self, other: &Self) -> bool {
+        self.id_ == other.id_
+    }
 }
 
 impl Default for Client {
@@ -34,12 +44,39 @@ impl Default for Client {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ClientInfo {
+    pub client: Client,
+    pub status: ClientStatus,
+}
+
+impl ClientInfo {
+    pub fn to_pb_client_info(&self) -> PbClientInfo {
+        PbClientInfo {
+            id: self.client.id_.clone(),
+            name: self.client.name_.clone(),
+            color: self.client.color_ as u32,
+            kyber_pk: self.client.kyber_pk_.clone(),
+            status: self.status as i32,
+        }
+    }
+}
+
+impl Default for ClientInfo {
+    fn default() -> Self {
+        Self {
+            client: Client::default(),
+            status: ClientStatus::Online,
+        }
+    }
+}
+
 lazy_static! {
     pub static ref CLIENT_MANAGER: Arc<RwLock<ClientManager>> =
         Arc::new(RwLock::new(ClientManager::new()));
 }
 pub struct ClientManager {
-    pub clients: HashMap<u32, Client>,
+    pub clients: HashMap<u32, ClientInfo>,
 }
 
 impl ClientManager {
@@ -86,9 +123,14 @@ impl ClientManager {
             .unwrap()
     }
 
-    pub async fn login_client(conn_id: u32, client: Client) {
+    pub async fn login_client(conn_id: u32, client: Client) -> ClientInfo {
         let mut client_manager = CLIENT_MANAGER.write().await;
-        client_manager.clients.insert(conn_id, client);
+        let info = ClientInfo {
+            client: client,
+            status: ClientStatus::Online,
+        };
+        client_manager.clients.insert(conn_id, info.clone());
+        info
     }
 
     pub async fn get_client_by_id(id: &str) -> Option<Client> {
@@ -100,7 +142,7 @@ impl ClientManager {
             .unwrap()
     }
 
-    pub async fn get_online_client_by_connection(conn_id: u32) -> Option<Client> {
+    pub async fn get_online_client_by_connection(conn_id: u32) -> Option<ClientInfo> {
         let client_manager = CLIENT_MANAGER.read().await;
         let client = client_manager.clients.get(&conn_id);
         if client.is_none() {
@@ -111,27 +153,21 @@ impl ClientManager {
 
     pub async fn get_client_connection_by_id(id: &str) -> Option<u32> {
         let client_manager = CLIENT_MANAGER.read().await;
-        for (conn_id, client) in client_manager.clients.iter() {
-            if client.id_ == id {
+        for (conn_id, client_info) in client_manager.clients.iter() {
+            if client_info.client.id_ == id {
                 return Some(*conn_id);
             }
         }
         None
     }
 
-    pub async fn get_client_by_connection(conn_id: u32) -> Option<Client> {
+    pub async fn get_client_by_connection(conn_id: u32) -> Option<ClientInfo> {
         let client_manager = CLIENT_MANAGER.read().await;
-        let client_id = client_manager.clients.get(&conn_id);
-        if client_id.is_none() {
+        let client_info = client_manager.clients.get(&conn_id);
+        if client_info.is_none() {
             return None;
         }
-        let client_id = client_id.unwrap();
-        let mut conn: SqliteConnection = get_db_connection();
-        clients_
-            .filter(id_.eq(client_id.id_.clone()))
-            .first::<Client>(&mut conn)
-            .optional()
-            .unwrap()
+        Some(client_info.unwrap().clone())
     }
 
     pub async fn remove_connection(conn_id: u32) {
@@ -139,9 +175,34 @@ impl ClientManager {
         client_manager.clients.remove(&conn_id);
     }
 
-    pub async fn get_all_clients() -> Vec<Client> {
+    pub async fn get_all_online_clients() -> Vec<ClientInfo> {
+        let client_manager: tokio::sync::RwLockReadGuard<'_, ClientManager> =
+            CLIENT_MANAGER.read().await;
+        client_manager.clients.values().cloned().collect()
+    }
+
+    pub async fn get_all_clients() -> Vec<ClientInfo> {
+        let client_manager = CLIENT_MANAGER.read().await;
+        let online_clients = client_manager.clients.values().cloned().collect::<Vec<_>>();
+
+        // get offline clients
         let mut conn: SqliteConnection = get_db_connection();
-        clients_.load::<Client>(&mut conn).unwrap()
+        let all_clients = clients_.load::<Client>(&mut conn).unwrap();
+        let offline_clients = all_clients
+            .iter()
+            .filter(|client| !online_clients.iter().any(|c| c.client.id_ == client.id_))
+            .map(|client| ClientInfo {
+                client: client.clone(),
+                status: ClientStatus::Offline,
+            })
+            .collect::<Vec<_>>();
+        info!("online_clients: {:?}", offline_clients.len());
+        online_clients.into_iter().chain(offline_clients).collect()
+    }
+
+    pub async fn get_all_connections() -> Vec<u32> {
+        let client_manager = CLIENT_MANAGER.read().await;
+        client_manager.clients.keys().cloned().collect()
     }
 
     pub async fn update_color(id: &str, color: i32) {
@@ -154,7 +215,22 @@ impl ClientManager {
 
         if let Some(client) = Self::get_client_connection_by_id(id).await {
             let mut client_manager = CLIENT_MANAGER.write().await;
-            client_manager.clients.get_mut(&client).unwrap().color_ = color;
+            client_manager
+                .clients
+                .get_mut(&client)
+                .unwrap()
+                .client
+                .color_ = color;
         }
+    }
+
+    pub async fn get_status(conn_id: u32) -> ClientStatus {
+        let client_manager = CLIENT_MANAGER.read().await;
+        client_manager.clients.get(&conn_id).unwrap().status
+    }
+
+    pub async fn update_status(conn_id: u32, status: ClientStatus) {
+        let mut client_manager = CLIENT_MANAGER.write().await;
+        client_manager.clients.get_mut(&conn_id).unwrap().status = status;
     }
 }

@@ -1,10 +1,8 @@
 use anyhow::{anyhow, Result};
-use orwell::{
-    pb::orwell::{
-        ClientMessage, Message as PbMessage, MessageType, PacketType, ServerBroadcastClientLogin,
-        ServerBroadcastClientLogout, ServerBroadcastMessage, ServerHistoryMessage,
-    },
-    schema::messages_::msg_type_,
+use orwell::pb::orwell::{
+    ClientInfo as PbClientInfo, ClientMessage, ClientStatus, Key, MessageType, PacketType,
+    ServerBroadcastClientLogin, ServerBroadcastClientLogout, ServerBroadcastMessage,
+    ServerClientInfo, ServerHistoryMessage,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -12,9 +10,9 @@ use tracing::{error, info, warn};
 
 use crate::{
     broadcast_message_from_server,
-    client::{Client, ClientManager, CLIENT_MANAGER},
+    client::{Client, ClientInfo, ClientManager, CLIENT_MANAGER},
     message::MessageManager,
-    send_packet, WsSender,
+    send_packet, WsSender, SENDERS,
 };
 
 pub struct Service {}
@@ -24,30 +22,21 @@ impl Service {
         Self {}
     }
 
-    pub async fn login_client(
-        conn_id: u32,
-        client: Client,
-        ws_sender: Arc<Mutex<WsSender>>,
-    ) -> Result<()> {
-        ClientManager::login_client(conn_id, client.clone()).await;
+    pub async fn login_client(conn_id: u32, client: Client) -> Result<()> {
+        let login_client_info = ClientManager::login_client(conn_id, client.clone()).await;
 
-        match broadcast_message_from_server(
+        broadcast_message_from_server(
             MessageType::Login,
             &vec![],
             Some(client.id_.clone()),
             Some(client.name_.clone()),
             Some(client.color_.clone()),
-            ws_sender.clone(),
             true,
         )
-        .await
-        {
-            Ok(_) => info!("{} 已登录至服务器", client.name_.clone()),
-            Err(e) => error!("{} 退出时广播失败: {:?}", client.name_.clone(), e),
-        };
+        .await?;
 
         let mut packet = ServerHistoryMessage { data: vec![] };
-        for message in MessageManager::get_history_messages(client.id_, 50).await {
+        for (message, key) in MessageManager::get_history_messages(client.id_.clone(), 50).await {
             let client = ClientManager::get_client_by_id(&message.sender_id_).await;
             let client = client.unwrap_or_default();
             let sender_id = client.id_.clone();
@@ -57,42 +46,81 @@ impl Service {
                 sender_id,
                 sender_name,
                 color,
-                data: Some(PbMessage {
-                    id: message.receiver_id_,
-                    msg_type: message.msg_type_,
-                    ciphertext: message.data_,
-                    timestamp: message.timestamp_ as u64,
+                data: message.data_,
+                key: Some(Key {
+                    receiver_id: key.receiver_id_,
+                    ciphertext: key.data_,
                 }),
+                timestamp: message.timestamp_ as u64,
             });
         }
 
-        send_packet(
-            conn_id,
-            ws_sender.clone(),
-            PacketType::ServerHistoryMessage,
-            packet,
-        )
-        .await
-        .map_err(|e| anyhow!("{} 发送历史消息失败: {:?}", client.name_.clone(), e))
+        send_packet(conn_id, PacketType::ServerHistoryMessage, packet)
+            .await
+            .map_err(|e| anyhow!("{} 发送历史消息失败: {:?}", client.name_.clone(), e))?;
+
+        let infos = ClientManager::get_all_clients()
+            .await
+            .into_iter()
+            .map(|info| info.to_pb_client_info())
+            .collect::<Vec<_>>();
+
+        for online_client_info in ClientManager::get_all_online_clients().await {
+            let conn_id =
+                ClientManager::get_client_connection_by_id(&online_client_info.client.id_)
+                    .await
+                    .unwrap();
+            send_packet(
+                conn_id,
+                PacketType::ServerClientInfo,
+                ServerClientInfo {
+                    data: infos.clone(),
+                },
+            )
+            .await?;
+        }
+
+        Ok(())
     }
 
-    pub async fn logout_client(conn_id: u32, ws_sender: Arc<Mutex<WsSender>>) {
-        if let Some(client) = ClientManager::get_client_by_connection(conn_id).await {
+    pub async fn logout_client(conn_id: u32) -> Result<()> {
+        if let Some(client_info) = ClientManager::get_client_by_connection(conn_id).await {
+            let client = client_info.client;
             ClientManager::remove_connection(conn_id).await;
-            match broadcast_message_from_server(
+            broadcast_message_from_server(
                 MessageType::Logout,
                 &vec![],
                 Some(client.id_.clone()),
                 Some(client.name_.clone()),
                 Some(client.color_.clone()),
-                ws_sender.clone(),
                 true,
             )
-            .await
-            {
-                Ok(_) => info!("{} 已登录至服务器", client.name_.clone()),
-                Err(e) => error!("{} 退出时广播失败: {:?}", client.name_.clone(), e),
-            }
+            .await?;
         }
+        Ok(())
+    }
+
+    pub async fn broadcast_resync_client() -> Result<()> {
+        let infos = ClientManager::get_all_clients()
+            .await
+            .into_iter()
+            .map(|info| info.to_pb_client_info())
+            .collect::<Vec<_>>();
+
+        for online_client_info in ClientManager::get_all_online_clients().await {
+            let conn_id =
+                ClientManager::get_client_connection_by_id(&online_client_info.client.id_)
+                    .await
+                    .unwrap();
+            send_packet(
+                conn_id,
+                PacketType::ServerClientInfo,
+                ServerClientInfo {
+                    data: infos.clone(),
+                },
+            )
+            .await?;
+        }
+        Ok(())
     }
 }

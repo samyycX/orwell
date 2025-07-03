@@ -1,24 +1,241 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, Key, KeyInit, Nonce};
 use anyhow::Result;
 use crystals_dilithium::dilithium5;
-use hkdf::Hkdf;
+use hkdf::{
+    hmac::{Hmac, Mac},
+    Hkdf,
+};
 use lazy_static::lazy_static;
 use pbkdf2::pbkdf2_hmac;
-use pqcrypto_kyber::{kyber1024_decapsulate, kyber1024_encapsulate};
-use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
+use pqcrypto_kyber::{kyber1024, kyber1024_decapsulate, kyber1024_encapsulate, kyber1024_keypair};
+use pqcrypto_traits::{
+    kem::{Ciphertext, PublicKey, SecretKey, SharedSecret},
+    sign::PublicKey as SignPublicKey,
+};
 use prost::Message;
 use sha2::Sha256;
 use sha3::{Digest, Sha3_512};
+use tracing::info;
 
 use crate::{
-    pb::orwell::{OrwellPacket, OrwellSignedPacket, PacketType},
+    pb::orwell::{OrwellPacket, OrwellRatchetPacket, OrwellSignedPacket, PacketType},
     shared::helper::get_now_timestamp,
 };
 use rand::prelude::*;
-use std::{collections::VecDeque, sync::Mutex};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Mutex,
+};
 
-const TIME_LIMIT: u64 = 10;
+const TIME_LIMIT: u64 = 10000;
 const KYBER1024_CIPHERTEXTBYTES: usize = 1568;
+
+#[derive(Clone, PartialEq)]
+pub enum RatchetState {
+    HandshakePhase1,
+    HandshakePhase2,
+    HandshakeFinished,
+}
+
+#[derive(Clone)]
+pub struct KyberDoubleRatchet {
+    pub kyber_sk: kyber1024::SecretKey,
+    pub kyber_pk: kyber1024::PublicKey,
+
+    root_key: Vec<u8>,
+    send_chain_key: Vec<u8>,
+    recv_chain_key: Vec<u8>,
+
+    send_chain_counter: u64,
+    recv_chain_counter: u64,
+
+    pub ratchet_state: RatchetState,
+    remote_pk: Option<kyber1024::PublicKey>,
+    skipped_keys: HashMap<(Vec<u8>, u64), Vec<u8>>,
+}
+
+impl KyberDoubleRatchet {
+    pub fn new() -> Self {
+        let (pk, sk) = kyber1024_keypair();
+        Self {
+            kyber_sk: sk,
+            kyber_pk: pk,
+            root_key: vec![0u8; 32],
+            send_chain_key: vec![0u8; 32],
+            recv_chain_key: vec![0u8; 32],
+            send_chain_counter: 0,
+            recv_chain_counter: 0,
+            ratchet_state: RatchetState::HandshakePhase1,
+            remote_pk: None,
+            skipped_keys: HashMap::new(),
+        }
+    }
+
+    fn hkdf_derive_key(ikm: &[u8], salt: &[u8], info: String, length: usize) -> Vec<u8> {
+        let hk = Hkdf::<Sha256>::new(Some(&salt[..]), &ikm);
+        let mut okm = vec![0u8; length];
+        hk.expand(&info.as_bytes(), &mut okm).unwrap();
+        okm
+    }
+
+    pub fn hmac_sha256(data: &[u8], key: &[u8]) -> Vec<u8> {
+        let mut hmac = <Hmac<Sha256> as KeyInit>::new_from_slice(&key).unwrap();
+        hmac.update(data);
+        hmac.finalize().into_bytes().to_vec()
+    }
+
+    fn derive_root_key(&mut self, shared_secret: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+        let new = Self::hkdf_derive_key(
+            shared_secret,
+            &self.root_key,
+            "OrwellKDRDerive".to_string(),
+            64,
+        );
+        let (root_key, other_key) = new.split_at(32);
+        Ok((root_key.to_vec(), other_key.to_vec()))
+    }
+
+    pub fn initialize_session(&mut self, remote_pk: &[u8]) -> Result<Vec<u8>> {
+        let remote_pk = PublicKey::from_bytes(remote_pk)
+            .map_err(|_| anyhow::anyhow!("Invalid public key length"))?;
+        let (shared_secret, ct) = kyber1024_encapsulate(&remote_pk);
+        let mut salt = [0u8; 64];
+        let mut rng = rand::thread_rng();
+        rng.fill(&mut salt);
+        let root_key = Self::hkdf_derive_key(
+            shared_secret.as_bytes(),
+            &salt,
+            "OrwellKDRRootKey".to_string(),
+            32,
+        );
+        self.root_key = root_key;
+        self.remote_pk = Some(remote_pk);
+        let send_ct = self.step_send_chain()?;
+
+        let mut result = vec![];
+        result.extend_from_slice(&salt);
+        result.extend_from_slice(ct.as_bytes());
+        result.extend_from_slice(send_ct.as_bytes());
+        Ok(result)
+    }
+
+    pub fn establish_session(
+        &mut self,
+        remote_ciphertext: &[u8],
+        remote_pk: &[u8],
+    ) -> Result<kyber1024::Ciphertext> {
+        if remote_ciphertext.len() != 64 + 2 * KYBER1024_CIPHERTEXTBYTES {
+            return Err(anyhow::anyhow!("Invalid ciphertext length"));
+        }
+
+        let salt = &remote_ciphertext[..64];
+        let ct = &remote_ciphertext[64..64 + KYBER1024_CIPHERTEXTBYTES];
+        let send_ct = &remote_ciphertext[64 + KYBER1024_CIPHERTEXTBYTES..];
+        let ct = Ciphertext::from_bytes(ct).map_err(|_| anyhow::anyhow!("Invalid ciphertext"))?;
+        let send_ct = Ciphertext::from_bytes(send_ct)
+            .map_err(|_| anyhow::anyhow!("Invalid send ciphertext"))?;
+        let shared_secret = kyber1024_decapsulate(&ct, &self.kyber_sk);
+        let send_shared_secret = kyber1024_decapsulate(&send_ct, &self.kyber_sk);
+        let root_key = Self::hkdf_derive_key(
+            shared_secret.as_bytes(),
+            &salt,
+            "OrwellKDRRootKey".to_string(),
+            32,
+        );
+        self.root_key = root_key;
+        self.remote_pk = Some(PublicKey::from_bytes(remote_pk)?);
+        self.step_recv_chain(send_shared_secret.as_bytes())?;
+
+        let ct = self.step_send_chain()?;
+
+        Ok(ct)
+    }
+
+    pub fn finalize_session(&mut self, ciphertext: &[u8]) -> Result<()> {
+        let ct = Ciphertext::from_bytes(ciphertext)
+            .map_err(|_| anyhow::anyhow!("Invalid ciphertext"))?;
+        let shared_secret = kyber1024_decapsulate(&ct, &self.kyber_sk);
+        self.step_recv_chain(shared_secret.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn step_send_chain(&mut self) -> Result<kyber1024::Ciphertext> {
+        let (shared_secret, ct) = kyber1024_encapsulate(&self.remote_pk.unwrap());
+        let (root_key, send_chain_key) = self.derive_root_key(shared_secret.as_bytes())?;
+        self.root_key = root_key;
+        self.send_chain_key = send_chain_key;
+        self.send_chain_counter = 0;
+        Ok(ct)
+    }
+
+    pub fn step_recv_chain(&mut self, shared_secret: &[u8]) -> Result<()> {
+        let (root_key, recv_chain_key) = self.derive_root_key(shared_secret)?;
+        self.root_key = root_key;
+        self.recv_chain_key = recv_chain_key;
+        self.recv_chain_counter = 0;
+        Ok(())
+    }
+
+    pub fn encrypt(&mut self, data: OrwellSignedPacket) -> Result<OrwellRatchetPacket> {
+        let message_key = Self::hmac_sha256(
+            self.send_chain_key.as_slice(),
+            "OrwellKDRMessageKey".as_bytes(),
+        );
+
+        self.send_chain_key = Self::hmac_sha256(
+            self.send_chain_key.as_slice(),
+            "OrwellKDRChainKey".as_bytes(),
+        );
+
+        let packet = OrwellRatchetPacket {
+            kyber_pk: self.kyber_pk.as_bytes().to_vec(),
+            send_counter: self.send_chain_counter,
+            recv_counter: self.recv_chain_counter,
+            data: Encryption::aes_encrypt(data.encode_to_vec().as_slice(), message_key.as_slice()),
+        };
+
+        self.send_chain_counter += 1;
+        Ok(packet)
+    }
+
+    pub fn decrypt(&mut self, packet: OrwellRatchetPacket) -> Result<OrwellSignedPacket> {
+        if packet.send_counter > self.recv_chain_counter {
+            for i in self.recv_chain_counter..packet.send_counter {
+                let skipped_key = Self::hmac_sha256(
+                    self.recv_chain_key.as_slice(),
+                    "OrwellKDRMessageKey".as_bytes(),
+                );
+                self.skipped_keys
+                    .insert((packet.kyber_pk.clone(), i), skipped_key);
+                self.recv_chain_key = Self::hmac_sha256(
+                    self.recv_chain_key.as_slice(),
+                    "OrwellKDRChainKey".as_bytes(),
+                );
+            }
+        };
+
+        let key_id = (packet.kyber_pk.clone(), packet.send_counter);
+        let message_key = if let Some(key) = self.skipped_keys.get(&key_id) {
+            key.clone()
+        } else {
+            let message_key = Self::hmac_sha256(
+                self.recv_chain_key.as_slice(),
+                "OrwellKDRMessageKey".as_bytes(),
+            );
+            self.recv_chain_key = Self::hmac_sha256(
+                self.recv_chain_key.as_slice(),
+                "OrwellKDRChainKey".as_bytes(),
+            );
+            message_key
+        };
+        self.skipped_keys.remove(&key_id);
+
+        let plaintext = Encryption::aes_decrypt(packet.data.as_slice(), message_key.as_slice())?;
+        let result = OrwellSignedPacket::decode(plaintext.as_slice())?;
+        self.recv_chain_counter = packet.send_counter + 1;
+        Ok(result)
+    }
+}
 
 struct Salt {
     timestamp: u64,
@@ -90,8 +307,13 @@ impl Encryption {
 
         let now_timestamp = get_now_timestamp();
 
-        if now_timestamp - data.timestamp > TIME_LIMIT {
-            return Err(anyhow::anyhow!("时间戳过期"));
+        if now_timestamp.abs_diff(data.timestamp) > TIME_LIMIT {
+            return Err(anyhow::anyhow!(
+                "时间戳过期: 当前={}, 数据={}, 差值={}",
+                now_timestamp,
+                data.timestamp,
+                now_timestamp - data.timestamp
+            ));
         }
 
         if !Encryption::check_and_put_salt(&data.salt) {
@@ -139,7 +361,7 @@ impl Encryption {
 
     pub fn aes_decrypt(data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
         if data.len() < 44 {
-            return Err(anyhow::anyhow!("Invalid data length"));
+            return Err(anyhow::anyhow!("AES Invalid data length"));
         }
 
         let salt = &data[..32];
@@ -171,7 +393,7 @@ impl Encryption {
 
     pub fn kyber_decrypt(data: &[u8], sk: &[u8]) -> Result<Vec<u8>> {
         if data.len() < KYBER1024_CIPHERTEXTBYTES + 32 + 12 {
-            return Err(anyhow::anyhow!("Invalid data length"));
+            return Err(anyhow::anyhow!("Kyber Invalid data length"));
         }
 
         let ct_bytes = &data[..KYBER1024_CIPHERTEXTBYTES];
@@ -183,7 +405,8 @@ impl Encryption {
             SecretKey::from_bytes(sk).map_err(|_| anyhow::anyhow!("Invalid secret key length"))?;
         let shared_secret = kyber1024_decapsulate(&ciphertext, &secret_key);
 
-        let decrypted = Self::aes_decrypt(encrypted, shared_secret.as_bytes())?;
+        let decrypted = Self::aes_decrypt(encrypted, shared_secret.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Kyber Decryption failed: {}", e))?;
         Ok(decrypted)
     }
 
@@ -213,7 +436,7 @@ impl Encryption {
         packet_type: PacketType,
         packet: T,
         dilithium_sk: &[u8],
-        shared_secret: &[u8],
+        ratchet: &mut KyberDoubleRatchet,
     ) -> Result<Vec<u8>>
     where
         T: prost::Message,
@@ -230,7 +453,7 @@ impl Encryption {
             data: Some(packet),
             sign: sign.to_vec(),
         };
-        let data = Self::aes_encrypt(packet.encode_to_vec().as_slice(), shared_secret);
-        Ok(data)
+        let data = ratchet.encrypt(packet)?;
+        Ok(data.encode_to_vec())
     }
 }
