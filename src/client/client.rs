@@ -45,6 +45,9 @@ struct State {
     logged: bool,
     connected: bool,
     processing: bool,
+    processed_bytes: u64,
+    ratchet_roll_time: u64,
+    start_time: u64,
 }
 
 struct App {
@@ -159,6 +162,9 @@ lazy_static! {
         logged: false,
         connected: false,
         processing: false,
+        processed_bytes: 0,
+        ratchet_roll_time: 0,
+        start_time: 0,
     });
 }
 
@@ -480,6 +486,18 @@ fn render(frame: &mut Frame, app: &mut App) {
         let mut state_text = vec![
             RatatuiLine::from(vec![Span::styled(
                 format!(" \u{eb50} {}", state.server_url),
+                Style::default().fg(Theme::catppuccin().lavender),
+            )]),
+            RatatuiLine::from(vec![Span::styled(
+                format!(" \u{eae8} {}B", state.processed_bytes),
+                Style::default().fg(Theme::catppuccin().lavender),
+            )]),
+            RatatuiLine::from(vec![Span::styled(
+                format!(" \u{f013} 棘轮转动{}次", state.ratchet_roll_time),
+                Style::default().fg(Theme::catppuccin().lavender),
+            )]),
+            RatatuiLine::from(vec![Span::styled(
+                format!(" \u{f013} 在线时长 {}", Service::get_online_time()),
                 Style::default().fg(Theme::catppuccin().lavender),
             )]),
             RatatuiLine::from(vec![]),
