@@ -578,7 +578,7 @@ async fn main() -> Result<()> {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
     let key: PrivateKeyDer<'static> =
-        rustls_pemfile::pkcs8_private_keys(&mut BufReader::new(fs::File::open(key_path)?))
+        rustls_pemfile::ec_private_keys(&mut BufReader::new(fs::File::open(key_path)?))
             .next()
             .unwrap()
             .map(Into::into)?;
