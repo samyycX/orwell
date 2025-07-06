@@ -76,7 +76,7 @@ impl KeyManager {
         saved.extend_from_slice(&salt);
         saved.extend_from_slice(&nonce);
 
-        let key = Encryption::pbkdf2_derive_key(password.as_bytes(), &salt);
+        let key = Encryption::argon2id_derive_key(password.as_bytes(), &salt);
         let cipher = Aes256Gcm::new(&key);
         let nonce = Nonce::from_slice(&nonce);
         data.splice(0..0, "0RW3LL".as_bytes().to_vec());
@@ -136,7 +136,7 @@ impl KeyManager {
         drop(state);
 
         let data = fs::read(Self::get_profile_path(&name_clone)).unwrap();
-        let key = Encryption::pbkdf2_derive_key(password_clone.as_bytes(), &data[0..32]);
+        let key = Encryption::argon2id_derive_key(password_clone.as_bytes(), &data[0..32]);
         let cipher = Aes256Gcm::new(&key);
         let nonce = Nonce::from_slice(&data[32..44]);
         let plaintext = match cipher.decrypt(nonce, &data[44..]) {

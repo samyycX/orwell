@@ -1,5 +1,6 @@
 use aes_gcm::{aead::Aead, Aes256Gcm, Key, KeyInit, Nonce};
 use anyhow::Result;
+use argon2::Argon2;
 use crystals_dilithium::dilithium5;
 use hkdf::{
     hmac::{Hmac, Mac},
@@ -323,10 +324,13 @@ impl Encryption {
         Ok(data)
     }
 
-    pub fn pbkdf2_derive_key(original_key: &[u8], salt: &[u8]) -> Key<Aes256Gcm> {
+    pub fn argon2id_derive_key(original_key: &[u8], salt: &[u8]) -> Key<Aes256Gcm> {
         let mut key = [0u8; 32];
 
-        pbkdf2_hmac::<Sha256>(&original_key, salt, 100_000, &mut key);
+        let argon2 = Argon2::default();
+        argon2
+            .hash_password_into(original_key, salt, &mut key)
+            .unwrap();
 
         Key::<Aes256Gcm>::clone_from_slice(&key)
     }
