@@ -5,15 +5,14 @@ impl Notifier {
         #[cfg(target_os = "windows")]
         unsafe {
             use winapi::um::{
-                processthreadsapi::GetCurrentProcessId,
                 wincon::GetConsoleWindow,
                 winuser::{
-                    FlashWindowEx, GetFocus, GetForegroundWindow, GetParent,
+                    FlashWindowEx, GetForegroundWindow, GetParent,
                     GetWindowThreadProcessId, FLASHWINFO, FLASHW_TIMERNOFG, FLASHW_TRAY,
                 },
             };
 
-            use crate::message::{add_debug_message, MessageLevel};
+            
 
             let hwnd = GetForegroundWindow();
             let mut focus_process_id = 0;

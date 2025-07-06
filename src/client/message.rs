@@ -1,10 +1,9 @@
-use chrono::{DateTime, Local, TimeZone, Utc};
+use chrono::TimeZone;
 use lazy_static::lazy_static;
 use orwell::shared::helper::get_now_timestamp;
 use ratatui::style::{Color, Style};
 use std::sync::Mutex;
 
-use crate::notify::Notifier;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageLevel {
