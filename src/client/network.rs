@@ -2,19 +2,17 @@ use anyhow::Result;
 use crystals_dilithium::dilithium5;
 use lazy_static::lazy_static;
 use orwell::pb::orwell::{
-    ClientHello, ClientHello2, ClientPreLogin, OrwellRatchetPacket, OrwellSignedPacket, PacketType,
+    ClientHello, ClientHello2, ClientPreLogin, OrwellRatchetPacket, PacketType,
     ServerHello,
 };
 use orwell::shared::encryption::{Encryption, KyberDoubleRatchet, RatchetState};
 use orwell::shared::helper::get_version;
-use pqcrypto_kyber::kyber1024::SecretKey;
-use pqcrypto_kyber::{kyber1024_decapsulate, kyber1024_keypair};
+use pqcrypto_kyber::kyber1024_decapsulate;
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SharedSecret};
 use prost::Message as ProstMessage;
 use std::sync::{mpsc, RwLock};
 use std::thread;
 use tokio::sync::mpsc as async_mpsc;
-use tracing_subscriber::fmt::format;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};

@@ -6,11 +6,10 @@ use lazy_static::lazy_static;
 use orwell::{
     decode_packet,
     pb::orwell::{
-        ClientAfk, ClientChangeColor, ClientHello, ClientHello2, ClientInfo, ClientLogin,
+        ClientAfk, ClientChangeColor, ClientHello, ClientHello2, ClientLogin,
         ClientMessage, ClientPreLogin, ClientRegister, ClientStatus, Key, MessageType,
         OrwellRatchetPacket, OrwellRatchetStep, OrwellSignedPacket, PacketType,
-        ServerBroadcastChangeColor, ServerBroadcastMessage, ServerChangeColorResponse,
-        ServerClientInfo, ServerHeartbeat, ServerHello, ServerLoginResponse, ServerPreLogin,
+        ServerBroadcastChangeColor, ServerBroadcastMessage, ServerChangeColorResponse, ServerHeartbeat, ServerHello, ServerLoginResponse, ServerPreLogin,
         ServerRegisterResponse,
     },
     shared::{
@@ -18,11 +17,10 @@ use orwell::{
         helper::{get_now_timestamp, get_version},
     },
 };
-use pqcrypto_kyber::{kyber1024, kyber1024_encapsulate};
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SharedSecret};
 use prost::Message as ProstMessage;
 use rand::Rng;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::{
     collections::HashMap,
     fs,

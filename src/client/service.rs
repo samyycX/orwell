@@ -1,5 +1,4 @@
-use core::net;
-use std::{collections::HashMap, sync::RwLock, thread};
+use std::{collections::HashMap, sync::RwLock};
 
 use anyhow::{anyhow, Result};
 use color_eyre::owo_colors::OwoColorize;
@@ -19,18 +18,13 @@ use orwell::{
     },
 };
 use prost::Message as ProstMessage;
-use rand::{Rng, RngCore};
-use ratatui::{
-    crossterm::style::Stylize,
-    style::{Color, Modifier, Style},
-    text::Span,
-};
+use rand::Rng;
+use ratatui::style::{Color, Modifier, Style};
 
 use crate::{
     key::KeyManager,
     message::{
-        self, add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages,
-        Line, LineBuilder, MessageLevel, TextSpan,
+        add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages, LineBuilder, MessageLevel, TextSpan,
     },
     network::{Network, NETWORK},
     notify::Notifier,

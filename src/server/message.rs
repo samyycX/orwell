@@ -1,5 +1,4 @@
-use chrono::{DateTime, Local};
-use diesel::{insert_into, prelude::*, sql_types::Timestamp};
+use diesel::{insert_into, prelude::*};
 use orwell::{
     pb::orwell::Key as PbKey,
     schema::message_keys_::{self, dsl::*},

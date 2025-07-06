@@ -1,4 +1,4 @@
-use std::{fs, sync::RwLock, thread};
+use std::{fs, sync::RwLock};
 
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit, Nonce};
 use crystals_dilithium::dilithium5;

@@ -7,7 +7,6 @@ use hkdf::{
     Hkdf,
 };
 use lazy_static::lazy_static;
-use pbkdf2::pbkdf2_hmac;
 use pqcrypto_kyber::{kyber1024, kyber1024_decapsulate, kyber1024_encapsulate, kyber1024_keypair};
 use pqcrypto_traits::{
     kem::{Ciphertext, PublicKey, SecretKey, SharedSecret},
@@ -16,7 +15,6 @@ use pqcrypto_traits::{
 use prost::Message;
 use sha2::Sha256;
 use sha3::{Digest, Sha3_512};
-use tracing::info;
 
 use crate::{
     pb::orwell::{OrwellPacket, OrwellRatchetPacket, OrwellSignedPacket, PacketType},

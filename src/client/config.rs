@@ -3,7 +3,6 @@ use lazy_static::lazy_static;
 use std::path::Path;
 use std::sync::RwLock;
 
-use crate::message::add_chat_message;
 
 const CONFIG_FILE: &str = "./orwell.ini";
 

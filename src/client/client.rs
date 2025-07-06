@@ -1,10 +1,10 @@
-use std::{sync::RwLock, thread, time::Duration};
+use std::{sync::RwLock, time::Duration};
 
 use anyhow::Result;
 use lazy_static::lazy_static;
 use orwell::{
     pb::orwell::ClientStatus,
-    shared::helper::{get_hash_version, get_version},
+    shared::helper::get_hash_version,
 };
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},

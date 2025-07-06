@@ -1,18 +1,14 @@
 use anyhow::{anyhow, Result};
 use orwell::pb::orwell::{
-    ClientInfo as PbClientInfo, ClientMessage, ClientStatus, Key, MessageType, PacketType,
-    ServerBroadcastClientLogin, ServerBroadcastClientLogout, ServerBroadcastMessage,
+    Key, MessageType, PacketType, ServerBroadcastMessage,
     ServerClientInfo, ServerHistoryMessage,
 };
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tracing::{error, info, warn};
 
 use crate::{
     broadcast_message_from_server,
-    client::{Client, ClientInfo, ClientManager, CLIENT_MANAGER},
+    client::{Client, ClientManager},
     message::MessageManager,
-    send_packet, WsSender, SENDERS,
+    send_packet,
 };
 
 pub struct Service {}
