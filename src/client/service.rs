@@ -24,7 +24,8 @@ use ratatui::style::{Color, Modifier, Style};
 use crate::{
     key::KeyManager,
     message::{
-        add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages, LineBuilder, MessageLevel, TextSpan,
+        add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages,
+        LineBuilder, MessageLevel, TextSpan,
     },
     network::{Network, NETWORK},
     notify::Notifier,
@@ -134,6 +135,7 @@ impl Service {
                     add_chat_message("您尚未连接至服务器，无法改变颜色");
                     return;
                 }
+                drop(state);
                 let color = command[1];
                 if !color.starts_with('#') || color.len() != 7 {
                     add_chat_message("颜色代码必须是 #RRGGBB 格式");
