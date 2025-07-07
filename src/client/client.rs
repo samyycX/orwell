@@ -2,10 +2,7 @@ use std::{sync::RwLock, time::Duration};
 
 use anyhow::Result;
 use lazy_static::lazy_static;
-use orwell::{
-    pb::orwell::ClientStatus,
-    shared::helper::get_hash_version,
-};
+use orwell::{pb::orwell::ClientStatus, shared::helper::get_hash_version};
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     layout::{Constraint, Layout},
@@ -70,9 +67,11 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key: KeyEvent) {
-        if STATE.read().unwrap().processing {
+        let state = STATE.read().unwrap();
+        if state.processing {
             return;
         }
+        drop(state);
         if key.kind != KeyEventKind::Press {
             return;
         }
@@ -503,7 +502,7 @@ fn render(frame: &mut Frame, app: &mut App) {
             RatatuiLine::from(vec![]),
             RatatuiLine::from(vec![Span::styled(
                 format!(
-                    "用户列表 ({}/{})",
+                    "\u{f007} 用户列表 ({}/{})",
                     ClientManager::get_all_clients()
                         .iter()
                         .filter(|c| c.status == ClientStatus::Online)

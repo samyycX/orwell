@@ -6,11 +6,11 @@ use lazy_static::lazy_static;
 use orwell::{
     decode_packet,
     pb::orwell::{
-        ClientAfk, ClientChangeColor, ClientHello, ClientHello2, ClientLogin,
-        ClientMessage, ClientPreLogin, ClientRegister, ClientStatus, Key, MessageType,
-        OrwellRatchetPacket, OrwellRatchetStep, OrwellSignedPacket, PacketType,
-        ServerBroadcastChangeColor, ServerBroadcastMessage, ServerChangeColorResponse, ServerHeartbeat, ServerHello, ServerLoginResponse, ServerPreLogin,
-        ServerRegisterResponse,
+        ClientAfk, ClientChangeColor, ClientHello, ClientHello2, ClientLogin, ClientMessage,
+        ClientPreLogin, ClientRegister, ClientStatus, Key, MessageType, OrwellRatchetPacket,
+        OrwellRatchetStep, OrwellSignedPacket, PacketType, ServerBroadcastChangeColor,
+        ServerBroadcastMessage, ServerChangeColorResponse, ServerHeartbeat, ServerHello,
+        ServerLoginResponse, ServerPreLogin, ServerRegisterResponse,
     },
     shared::{
         encryption::{Encryption, KyberDoubleRatchet, RatchetState},
@@ -453,7 +453,9 @@ async fn handle_connection(
     let conn_id = addr.port() as u32;
     info!("New connection: {}", conn_id);
     // Store sender for global access
-    SENDERS.write().await.insert(conn_id, ws_sender.clone());
+    let mut senders = SENDERS.write().await;
+    senders.insert(conn_id, ws_sender.clone());
+    drop(senders);
     info!("Sender stored: {}", conn_id);
 
     while let Some(msg) = ws_receiver.next().await {
@@ -479,6 +481,7 @@ async fn handle_connection(
                             pk: ratchet.kyber_pk.as_bytes().to_vec(),
                             dilithium_pk: state.dilithium_pk.to_bytes().to_vec(),
                         };
+                        drop(state);
                         let mut connections = CONNECTIONS.write().await;
                         connections.insert(conn_id, ratchet);
                         drop(connections);
@@ -486,6 +489,7 @@ async fn handle_connection(
                         let response = packet.encode_to_vec();
                         let mut sender = ws_sender.lock().await;
                         sender.send(Message::Binary(response.into())).await.unwrap();
+                        drop(sender);
                         info!("已回应客户端");
                     }
                     RatchetState::HandshakePhase2 => {
@@ -499,6 +503,7 @@ async fn handle_connection(
                         let ratchet = ratchet.unwrap();
                         ratchet.finalize_session(&packet.ciphertext)?;
                         ratchet.ratchet_state = RatchetState::HandshakeFinished;
+                        drop(connections);
 
                         let mut random_data = vec![];
                         let mut rng = rand::rngs::OsRng::default();
@@ -510,9 +515,10 @@ async fn handle_connection(
                             .send(Message::Binary(random_data.to_vec().into()))
                             .await
                             .unwrap();
+                        drop(sender);
                     }
                     RatchetState::HandshakeFinished => {
-                        let mut connections = CONNECTIONS.write().await;
+                        let mut connections: tokio::sync::RwLockWriteGuard<'_, HashMap<u32, KyberDoubleRatchet>> = CONNECTIONS.write().await;
                         let ratchet: Option<&mut KyberDoubleRatchet> =
                             connections.get_mut(&conn_id);
                         if ratchet.is_none() {
@@ -533,6 +539,7 @@ async fn handle_connection(
                     .send(Message::Text("Invalid packet".to_string().into()))
                     .await
                     .unwrap();
+                drop(sender);
             }
             Ok(Message::Close(_)) => {
                 CONNECTIONS.write().await.remove(&conn_id);
@@ -595,7 +602,7 @@ async fn main() -> Result<()> {
         loop {
             let senders_clone = {
                 let senders = SENDERS.read().await;
-                ClientManager::get_all_connections()
+                let result = ClientManager::get_all_connections()
                     .await
                     .into_iter()
                     .filter_map(|conn_id| {
@@ -603,7 +610,9 @@ async fn main() -> Result<()> {
                             .get(&conn_id)
                             .map(|sender| (conn_id, sender.clone()))
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+                drop(senders);
+                result
             };
 
             for (conn_id, sender) in senders_clone {

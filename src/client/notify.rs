@@ -7,12 +7,10 @@ impl Notifier {
             use winapi::um::{
                 wincon::GetConsoleWindow,
                 winuser::{
-                    FlashWindowEx, GetForegroundWindow, GetParent,
-                    GetWindowThreadProcessId, FLASHWINFO, FLASHW_TIMERNOFG, FLASHW_TRAY,
+                    FlashWindowEx, GetForegroundWindow, GetParent, GetWindowThreadProcessId,
+                    FLASHWINFO, FLASHW_TIMERNOFG, FLASHW_TRAY,
                 },
             };
-
-            
 
             let hwnd = GetForegroundWindow();
             let mut focus_process_id = 0;
