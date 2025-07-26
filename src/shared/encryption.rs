@@ -403,8 +403,8 @@ impl Encryption {
 
         let ciphertext =
             Ciphertext::from_bytes(ct_bytes).map_err(|_| anyhow::anyhow!("Invalid ciphertext"))?;
-        let secret_key =
-            SecretKey::from_bytes(sk).map_err(|_| anyhow::anyhow!("Invalid secret key length"))?;
+        let secret_key = SecretKey::from_bytes(sk)
+            .map_err(|_| anyhow::anyhow!("kyber_decrypt: Invalid secret key length"))?;
         let shared_secret = kyber1024_decapsulate(&ciphertext, &secret_key);
 
         let decrypted = Self::aes_decrypt(encrypted, shared_secret.as_bytes())
@@ -415,7 +415,7 @@ impl Encryption {
     pub fn dilithium_sign(data: &[u8], sk: &[u8]) -> Result<Vec<u8>> {
         let mut sk_buf = [0u8; dilithium5::SECRETKEYBYTES];
         if sk.len() != dilithium5::SECRETKEYBYTES {
-            return Err(anyhow::anyhow!("Invalid secret key length"));
+            return Err(anyhow::anyhow!("dilithium_sign: Invalid secret key length"));
         }
         sk_buf.copy_from_slice(sk);
         let sk = dilithium5::SecretKey::from_bytes(&sk_buf);

@@ -1,10 +1,12 @@
 pub mod afk_adapter;
 pub mod color_adapter;
+pub mod heartbeat_adapter;
 pub mod login_adapter;
 pub mod message_adapter;
 pub mod pre_login_adapter;
 pub mod register_adapter;
 
+use crate::adapters::heartbeat_adapter::HeartbeatAdapter;
 use crate::adapters::{
     afk_adapter::AfkAdapter, color_adapter::ColorAdapter, login_adapter::LoginAdapter,
     message_adapter::MessageAdapter, pre_login_adapter::PreLoginAdapter,
@@ -22,6 +24,7 @@ pub fn create_registry() -> PacketAdapterRegistry {
     registry.register(Box::new(MessageAdapter));
     registry.register(Box::new(ColorAdapter));
     registry.register(Box::new(AfkAdapter));
+    registry.register(Box::new(HeartbeatAdapter));
 
     registry
 }
