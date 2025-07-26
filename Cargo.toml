@@ -18,6 +18,7 @@ edition = "2021"
 [dependencies]
 aes-gcm = "0.10.3"
 anyhow = "1.0.98"
+async-trait = "0.1.88"
 chrono = "0.4.41"
 classic-mceliece-rust = { version = "3.1.0", features = ["mceliece8192128f"] }
 color-eyre = "0.6.5"

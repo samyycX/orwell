@@ -6,11 +6,8 @@ use lazy_static::lazy_static;
 use orwell::{
     decode_packet,
     pb::orwell::{
-        ClientAfk, ClientChangeColor, ClientHello, ClientHello2, ClientLogin, ClientMessage,
-        ClientPreLogin, ClientRegister, ClientStatus, Key, MessageType, OrwellRatchetPacket,
-        OrwellRatchetStep, OrwellSignedPacket, PacketType, ServerBroadcastChangeColor,
-        ServerBroadcastMessage, ServerChangeColorResponse, ServerHeartbeat, ServerHello,
-        ServerLoginResponse, ServerPreLogin, ServerRegisterResponse,
+        ClientHello, ClientHello2, Key, MessageType, OrwellRatchetPacket, OrwellRatchetStep,
+        OrwellSignedPacket, PacketType, ServerBroadcastMessage, ServerHeartbeat, ServerHello,
     },
     shared::{
         encryption::{Encryption, KyberDoubleRatchet, RatchetState},
@@ -38,16 +35,22 @@ use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 use tracing::{info, warn};
 
 use crate::{
+    adapters::create_registry,
     client::ClientManager,
     config::{get_cert_fullchain_path, get_cert_key_path, get_port},
     message::MessageManager,
+    packet_adapter::PacketContext,
     service::Service,
     token::TokenManager,
 };
 
+use packet_adapter::PacketAdapterRegistry;
+
+mod adapters;
 mod client;
 mod config;
 mod message;
+mod packet_adapter;
 mod service;
 mod token;
 
@@ -192,245 +195,48 @@ where
     Ok(())
 }
 
+lazy_static! {
+    static ref ADAPTER_REGISTRY: tokio::sync::OnceCell<PacketAdapterRegistry> =
+        tokio::sync::OnceCell::const_new();
+}
+
+async fn get_adapter_registry() -> &'static PacketAdapterRegistry {
+    ADAPTER_REGISTRY
+        .get_or_init(|| async { create_registry() })
+        .await
+}
+
 async fn handle_packet(
     packet: OrwellSignedPacket,
     ws_sender: Arc<Mutex<WsSender>>,
     conn_id: u32,
 ) -> Result<()> {
     let client = ClientManager::get_client_by_connection(conn_id).await;
-    match client {
-        None => {
-            let packet = Encryption::validate(packet, None)?;
-            let type_ = PacketType::try_from(packet.packet_type)?;
-            match type_ {
-                PacketType::ClientPreLogin => {
-                    let packet = decode_packet!(packet, ClientPreLogin);
-                    let client = ClientManager::find_client(&packet.dilithium_pk);
 
-                    if get_version() != packet.version {
-                        let response = ServerPreLogin {
-                            registered: false,
-                            can_register: false,
-                            token: None,
-                            version_mismatch: true,
-                        };
-                        send_packet(conn_id, PacketType::ServerPreLogin, response).await?;
-                        ws_sender.lock().await.close().await?;
-                    }
-
-                    let response = if client.is_none() {
-                        ServerPreLogin {
-                            registered: false,
-                            can_register: true,
-                            token: None,
-                            version_mismatch: false,
-                        }
-                    } else {
-                        let token =
-                            TokenManager::generate_token(conn_id, &packet.dilithium_pk).await?;
-                        let token = Encryption::kyber_encrypt(&token, &client.unwrap().kyber_pk_)?;
-                        ServerPreLogin {
-                            registered: true,
-                            can_register: false,
-                            token: Some(token),
-                            version_mismatch: false,
-                        }
-                    };
-                    send_packet(conn_id, PacketType::ServerPreLogin, response).await?;
-                }
-                PacketType::ClientRegister => {
-                    let packet = decode_packet!(packet, ClientRegister);
-                    let client = ClientManager::find_client(&packet.dilithium_pk);
-                    let mut registered_client = None;
-                    let response = if client.is_some() {
-                        ServerRegisterResponse {
-                            success: false,
-                            color: None,
-                            message: Some("您已经注册过了".to_string()),
-                        }
-                    } else if ClientManager::is_name_taken(&packet.name) {
-                        ServerRegisterResponse {
-                            success: false,
-                            color: None,
-                            message: Some("该用户名已被占用".to_string()),
-                        }
-                    } else {
-                        let color = rand::thread_rng().gen_range(0..0x00FFFFFF);
-                        let client = ClientManager::register_client(
-                            &packet.name,
-                            &packet.kyber_pk,
-                            &packet.dilithium_pk,
-                            color,
-                        );
-                        registered_client.replace(client);
-                        ServerRegisterResponse {
-                            success: true,
-                            color: Some(color),
-                            message: Some("注册成功".to_string()),
-                        }
-                    };
-                    send_packet(conn_id, PacketType::ServerRegisterResponse, response).await?;
-
-                    if let Some(client) = registered_client {
-                        Service::login_client(conn_id, client.clone()).await?;
-                    }
-                }
-                PacketType::ClientLogin => {
-                    let packet = decode_packet!(packet, ClientLogin);
-                    let token = TokenManager::validate_token(conn_id, &packet.token_sign).await;
-                    let mut login_client = None;
-                    let response = if token.is_none() {
-                        ServerLoginResponse {
-                            success: false,
-                            message: Some("身份校验失败".to_string()),
-                        }
-                    } else {
-                        let pk = token.clone().unwrap().1;
-                        let client = ClientManager::find_client(&pk).unwrap();
-                        login_client.replace(client);
-                        ServerLoginResponse {
-                            success: true,
-                            message: Some("登录成功".to_string()),
-                        }
-                    };
-
-                    send_packet(conn_id, PacketType::ServerLoginResponse, response).await?;
-
-                    if let Some(client) = login_client {
-                        Service::login_client(conn_id, client).await?;
-                    }
-                }
-
-                _ => {}
-            }
-        }
-        Some(client_info) => {
-            let client = client_info.client;
-            let packet = Encryption::validate(
-                packet,
-                Some(&dilithium5::PublicKey::from_bytes(&client.dilithium_pk_)),
-            )?;
-            let type_ = PacketType::try_from(packet.packet_type);
-            if type_.is_err() {
-                return Err(anyhow::anyhow!("Illegal data sent by {}", client.name_));
-            }
-            let type_ = type_.unwrap();
-            match type_ {
-                PacketType::ClientMessage => {
-                    info!("收到消息");
-                    let packet = decode_packet!(packet, ClientMessage);
-                    let sender = client;
-                    let data = packet.data;
-                    for key in &packet.keys {
-                        let client = ClientManager::get_client_by_id(&key.receiver_id).await;
-                        if client.is_none() {
-                            continue;
-                        }
-                        let client = client.unwrap();
-                        if let Some(conn_id) =
-                            ClientManager::get_client_connection_by_id(&client.id_.clone()).await
-                        {
-                            info!("Receiver: {:?}", conn_id);
-                            send_packet(
-                                conn_id,
-                                PacketType::ServerBroadcastMessage,
-                                ServerBroadcastMessage {
-                                    sender_id: sender.id_.clone(),
-                                    sender_name: sender.name_.clone(),
-                                    key: Some(key.clone()),
-                                    data: data.clone(),
-                                    color: sender.color_,
-                                    timestamp: get_now_timestamp(),
-                                },
-                            )
-                            .await?;
-                        }
-                    }
-                    MessageManager::add_message(sender.id_.clone(), data.clone(), packet.keys)
-                        .await;
-                }
-                PacketType::ClientChangeColor => {
-                    let packet = decode_packet!(packet, ClientChangeColor);
-                    let clients = ClientManager::get_all_clients().await;
-                    if clients
-                        .iter()
-                        .map(|c| c.client.color_ == packet.color && c.client.id_ != client.id_)
-                        .any(|x| x)
-                    {
-                        send_packet(
-                            conn_id,
-                            PacketType::ServerChangeColorResponse,
-                            ServerChangeColorResponse {
-                                success: false,
-                                color: None,
-                                message: Some(format!("已经有用户在使用此颜色")),
-                            },
-                        )
-                        .await?;
-                    } else {
-                        broadcast_message_from_server(
-                            MessageType::ChangeColor,
-                            &ServerBroadcastChangeColor {
-                                id: client.id_.clone(),
-                                name: client.name_.clone(),
-                                old_color: client.color_,
-                                new_color: packet.color,
-                            }
-                            .encode_to_vec(),
-                            None,
-                            None,
-                            None,
-                            true,
-                        )
-                        .await?;
-
-                        ClientManager::update_color(&client.id_, packet.color).await;
-
-                        send_packet(
-                            conn_id,
-                            PacketType::ServerChangeColorResponse,
-                            ServerChangeColorResponse {
-                                success: true,
-                                color: Some(packet.color),
-                                message: None,
-                            },
-                        )
-                        .await?;
-                    }
-                }
-
-                PacketType::ClientAfk => {
-                    let packet = decode_packet!(packet, ClientAfk);
-                    let status = ClientManager::get_status(conn_id).await;
-                    if status == ClientStatus::Afk {
-                        ClientManager::update_status(conn_id, ClientStatus::Online).await;
-                        broadcast_message_from_server(
-                            MessageType::LeftAfk,
-                            &[],
-                            Some(client.id_.clone()),
-                            Some(client.name_.clone()),
-                            Some(client.color_),
-                            false,
-                        )
-                        .await?;
-                    } else {
-                        ClientManager::update_status(conn_id, ClientStatus::Afk).await;
-                        broadcast_message_from_server(
-                            MessageType::EnterAfk,
-                            &[],
-                            Some(client.id_.clone()),
-                            Some(client.name_.clone()),
-                            Some(client.color_),
-                            false,
-                        )
-                        .await?;
-                    }
-                    Service::broadcast_resync_client().await?;
-                }
-                _ => {}
-            }
-        }
+    let validated_packet = match &client {
+        None => Encryption::validate(packet.clone(), None)?,
+        Some(client_info) => Encryption::validate(
+            packet.clone(),
+            Some(&dilithium5::PublicKey::from_bytes(
+                &client_info.client.dilithium_pk_,
+            )),
+        )?,
     };
+
+    let packet_type = PacketType::try_from(validated_packet.packet_type)?;
+
+    let registry = get_adapter_registry().await;
+    if let Some(adapter) = registry.get(packet_type) {
+        let context = PacketContext {
+            conn_id,
+            ws_sender,
+            client_info: client,
+        };
+
+        adapter.process(validated_packet, context).await?;
+    } else {
+        tracing::warn!("No adapter found for packet type: {:?}", packet_type);
+    }
 
     Ok(())
 }
@@ -518,7 +324,10 @@ async fn handle_connection(
                         drop(sender);
                     }
                     RatchetState::HandshakeFinished => {
-                        let mut connections: tokio::sync::RwLockWriteGuard<'_, HashMap<u32, KyberDoubleRatchet>> = CONNECTIONS.write().await;
+                        let mut connections: tokio::sync::RwLockWriteGuard<
+                            '_,
+                            HashMap<u32, KyberDoubleRatchet>,
+                        > = CONNECTIONS.write().await;
                         let ratchet: Option<&mut KyberDoubleRatchet> =
                             connections.get_mut(&conn_id);
                         if ratchet.is_none() {
