@@ -15,6 +15,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
+    command_adapter::{CommandAdapterRegistry, CommandContext},
+    commands::create_command_registry,
     message::{
         add_chat_message, add_debug_message, calculate_optimal_prefix_width, get_chat_messages,
         get_debug_messages, get_time_format, toggle_time_format, MessageLevel,
@@ -24,11 +26,17 @@ use crate::{
 use crate::{service::ClientManager, theme::THEME};
 use crate::{theme::Theme, widgets::MultiInput};
 
+mod adapters;
+mod command_adapter;
+mod commands;
 mod config;
 mod key;
 mod message;
+mod message_adapter;
+mod message_adapters;
 mod network;
 mod notify;
+mod packet_adapter;
 mod service;
 mod theme;
 mod widgets;
@@ -87,7 +95,11 @@ impl App {
                 if let Some(message) = self.chat_input.get_text("chat") {
                     if !message.trim().is_empty() {
                         if message.starts_with("/") {
-                            Service::check_command(&message, self);
+                            let registry = COMMAND_REGISTRY.read().unwrap();
+                            let context = CommandContext { app: self };
+                            if let Err(e) = registry.process_command(&message, context) {
+                                add_chat_message(format!("命令执行失败: {}", e));
+                            }
                         } else {
                             if let Err(e) = Service::broadcast_message(message) {
                                 add_chat_message(format!("发送失败: {}", e));
@@ -165,6 +177,8 @@ lazy_static! {
         ratchet_roll_time: 0,
         start_time: 0,
     });
+    static ref COMMAND_REGISTRY: std::sync::RwLock<CommandAdapterRegistry> =
+        std::sync::RwLock::new(create_command_registry());
 }
 
 fn run(mut terminal: DefaultTerminal) -> Result<()> {
@@ -177,9 +191,11 @@ fn run(mut terminal: DefaultTerminal) -> Result<()> {
     add_chat_message(format!("VERSION={}", get_hash_version()));
     Service::check_login(&app);
 
+    let mut sleep_time = 200;
+
     loop {
         terminal.draw(|frame| render(frame, &mut app))?;
-        if event::poll(Duration::from_millis(50))? {
+        if event::poll(Duration::from_millis(sleep_time))? {
             match event::read()? {
                 Event::Key(key) => app.handle_key_event(key),
                 Event::Paste(text) => {
@@ -191,6 +207,13 @@ fn run(mut terminal: DefaultTerminal) -> Result<()> {
                 Event::Resize(_, _) => {}
                 _ => {}
             }
+        }
+        if notify::Notifier::is_focused() {
+            // If the console is focused, reset sleep time to 500ms
+            sleep_time = 200;
+        } else {
+            // If not focused, increase sleep time to reduce CPU usage
+            sleep_time = 3000;
         }
     }
 }

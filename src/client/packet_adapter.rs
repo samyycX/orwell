@@ -1,8 +1,10 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use orwell::pb::orwell::{OrwellPacket, PacketType};
 
-use crate::network::Network;
+use crate::{
+    message::{add_debug_message, MessageLevel},
+    network::Network,
+};
 
 /// Context for packet processing on client side
 pub struct ClientPacketContext<'a> {
@@ -10,13 +12,12 @@ pub struct ClientPacketContext<'a> {
 }
 
 /// Trait for client packet adapters
-#[async_trait]
 pub trait ClientPacketAdapter: Send + Sync {
     /// Get the packet type this adapter handles
     fn packet_type(&self) -> PacketType;
 
     /// Process the packet
-    async fn process(&self, packet: OrwellPacket, context: ClientPacketContext<'_>) -> Result<()>;
+    fn process(&self, packet: OrwellPacket, context: ClientPacketContext<'_>) -> Result<()>;
 }
 
 /// Registry for client packet adapters
@@ -36,6 +37,10 @@ impl ClientPacketAdapterRegistry {
     }
 
     pub fn get(&self, packet_type: PacketType) -> Option<&dyn ClientPacketAdapter> {
+        add_debug_message(
+            MessageLevel::Debug,
+            format!("正在获取数据包适配器: {:?}", packet_type),
+        );
         self.adapters.get(&packet_type).map(|a| a.as_ref())
     }
 }

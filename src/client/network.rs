@@ -2,8 +2,7 @@ use anyhow::Result;
 use crystals_dilithium::dilithium5;
 use lazy_static::lazy_static;
 use orwell::pb::orwell::{
-    ClientHello, ClientHello2, ClientPreLogin, OrwellRatchetPacket, PacketType,
-    ServerHello,
+    ClientHello, ClientHello2, ClientPreLogin, OrwellRatchetPacket, PacketType, ServerHello,
 };
 use orwell::shared::encryption::{Encryption, KyberDoubleRatchet, RatchetState};
 use orwell::shared::helper::get_version;
@@ -17,8 +16,10 @@ use tokio::sync::mpsc as async_mpsc;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-use crate::key::KeyManager;
+use crate::adapters::create_client_registry;
+use crate::key::{KeyManager, KEY_MANAGER};
 use crate::message::{add_chat_message, add_debug_message, MessageLevel};
+use crate::packet_adapter::{ClientPacketAdapterRegistry, ClientPacketContext};
 use crate::service::Service;
 use crate::STATE;
 
@@ -50,7 +51,7 @@ impl Network {
     }
 
     pub fn start(server_url: String) {
-        let mut state = STATE.write().unwrap();
+        let mut state: std::sync::RwLockWriteGuard<'_, crate::State> = STATE.write().unwrap();
         state.server_url = server_url.clone();
         drop(state);
 
@@ -204,8 +205,6 @@ impl Network {
                 add_chat_message("已协调棘轮，连接至服务器成功");
                 add_debug_message(MessageLevel::Info, "连接至服务器成功");
 
-                let profile = KeyManager::get_profile().unwrap();
-
                 let client_hello2 = ClientHello2 {
                     ciphertext: result.as_bytes().to_vec(),
                 };
@@ -217,7 +216,9 @@ impl Network {
                 self.ratchet.as_mut().unwrap().ratchet_state = RatchetState::HandshakePhase2;
             }
             RatchetState::HandshakePhase2 => {
-                let profile = KeyManager::get_profile().unwrap();
+                let key_manager = KEY_MANAGER.read().unwrap();
+                let profile = key_manager.as_ref().unwrap().profile.clone().unwrap();
+                drop(key_manager);
                 let packet = ClientPreLogin {
                     dilithium_pk: profile.dilithium_pk.to_vec(),
                     version: get_version(),
@@ -236,7 +237,13 @@ impl Network {
                     )),
                 )?;
 
-                Service::handle_packet(packet, self)?;
+                let registry = create_client_registry();
+                let mut context = ClientPacketContext { network: self };
+                if let Some(adapter) =
+                    registry.get(PacketType::try_from(packet.packet_type).unwrap())
+                {
+                    let _ = adapter.process(packet, context);
+                }
             }
         }
 
@@ -253,10 +260,13 @@ impl Network {
         let mut state = STATE.write().unwrap();
         state.ratchet_roll_time += 1;
         drop(state);
+        let key_manager = KEY_MANAGER.read().unwrap();
+        let profile = key_manager.as_ref().unwrap().profile.clone().unwrap();
+        drop(key_manager);
         match Encryption::encrypt_packet(
             packet_type,
             packet,
-            &KeyManager::get_profile().unwrap().dilithium_sk,
+            &profile.dilithium_sk,
             self.ratchet.as_mut().unwrap(),
         ) {
             Ok(encrypted) => {

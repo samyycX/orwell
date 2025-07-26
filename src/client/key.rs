@@ -19,11 +19,11 @@ use crate::{
 const PROFILE_FOLDER: &str = "./profiles";
 
 lazy_static! {
-    static ref KEY_MANAGER: RwLock<Option<KeyManager>> = RwLock::new(None);
+    pub static ref KEY_MANAGER: RwLock<Option<KeyManager>> = RwLock::new(None);
 }
 
 pub struct KeyManager {
-    profile: Option<Profile>,
+    pub profile: Option<Profile>,
 }
 
 impl KeyManager {
@@ -162,6 +162,7 @@ impl KeyManager {
         key_manager.replace(Self {
             profile: Some(key_pair),
         });
+        drop(key_manager);
 
         add_debug_message(MessageLevel::Info, "密钥加载成功");
         add_chat_message("登录成功！请使用/connect <服务器地址> 以连接到服务器。");
@@ -180,10 +181,5 @@ impl KeyManager {
             );
             Network::start(url);
         }
-    }
-
-    pub fn get_profile() -> Option<Profile> {
-        let key_manager = KEY_MANAGER.read().unwrap();
-        key_manager.as_ref().unwrap().profile.clone()
     }
 }

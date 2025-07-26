@@ -22,7 +22,7 @@ use rand::Rng;
 use ratatui::style::{Color, Modifier, Style};
 
 use crate::{
-    key::KeyManager,
+    key::{KeyManager, KEY_MANAGER},
     message::{
         add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages,
         LineBuilder, MessageLevel, TextSpan,
@@ -32,6 +32,8 @@ use crate::{
     App, STATE,
 };
 
+use crate::message_adapter::MessageContext;
+use crate::message_adapters::create_message_registry;
 #[derive(Clone)]
 pub struct ClientInfo {
     pub id: String,
@@ -42,7 +44,7 @@ pub struct ClientInfo {
 }
 
 lazy_static! {
-    static ref OTHER_CLIENTS: RwLock<HashMap<String, ClientInfo>> = RwLock::new(HashMap::new());
+    pub static ref OTHER_CLIENTS: RwLock<HashMap<String, ClientInfo>> = RwLock::new(HashMap::new());
 }
 
 pub struct ClientManager {}
@@ -66,6 +68,11 @@ impl ClientManager {
         clients
     }
 
+    pub fn add_client(client: ClientInfo) {
+        let mut clients = OTHER_CLIENTS.write().unwrap();
+        clients.insert(client.id.clone(), client);
+    }
+
     pub fn update_color(id: String, color: i32) {
         let mut clients = OTHER_CLIENTS.write().unwrap();
         if let Some(client) = clients.get_mut(&id) {
@@ -83,79 +90,9 @@ impl ClientManager {
 pub struct Service {}
 
 impl Service {
-    pub fn check_command(command: &str, app: &mut App) {
-        let command = command.split_whitespace().collect::<Vec<&str>>();
-        match command[0] {
-            "/help" => {
-                add_chat_message("/register <用户名> <密码> <确认密码>");
-                add_chat_message("/login <用户名> <密码>");
-                add_chat_message("/connect <服务器地址>");
-                add_chat_message("/color <颜色代码>");
-            }
-            "/register" => {
-                if command.len() != 4 {
-                    add_chat_message("使用方法: /register <用户名> <密码> <确认密码>");
-                } else {
-                    let name = command[1];
-                    let password = command[2];
-                    let confirm_password = command[3];
-                    if password != confirm_password {
-                        add_chat_message("密码不一致！");
-                    } else {
-                        add_chat_message("正在创建密钥...此过程需要数十秒，请耐心等候");
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                        KeyManager::create_key(name, password);
-                    }
-                }
-            }
-            "/login" => {
-                if command.len() != 3 {
-                    add_chat_message("使用方法: /login <用户名> <密码>");
-                } else {
-                    let name = command[1];
-                    let password = command[2];
-                    KeyManager::load_key(name, password);
-                }
-            }
-            "/connect" => {
-                if command.len() != 2 {
-                    add_chat_message("使用方法: /connect <服务器地址>");
-                } else {
-                    let server_address = command[1];
-                    Network::start(server_address.to_string());
-                }
-            }
-            "/color" => {
-                if command.len() != 2 {
-                    add_chat_message("使用方法: /color <颜色代码>");
-                    return;
-                }
-                let state = STATE.read().unwrap();
-                if !state.connected {
-                    add_chat_message("您尚未连接至服务器，无法改变颜色");
-                    return;
-                }
-                drop(state);
-                let color = command[1];
-                if !color.starts_with('#') || color.len() != 7 {
-                    add_chat_message("颜色代码必须是 #RRGGBB 格式");
-                    return;
-                }
-
-                match i32::from_str_radix(&color[1..], 16) {
-                    Ok(color) => {
-                        Self::change_color(color);
-                    }
-                    Err(_) => {
-                        add_chat_message("颜色代码格式错误，请使用 #RRGGBB 格式");
-                    }
-                }
-            }
-            "/afk" => {
-                Self::afk();
-            }
-            _ => {}
-        }
+    #[deprecated(note = "使用命令适配器模式，请使用 COMMAND_REGISTRY 处理命令")]
+    pub fn check_command(_command: &str, _app: &mut App) {
+        // 此方法已废弃，使用命令适配器模式
     }
 
     pub fn change_color(color: i32) {
@@ -203,294 +140,19 @@ impl Service {
             return Err(anyhow!("数据异常"));
         }
         let key = key.unwrap();
-        let profile = KeyManager::get_profile().unwrap();
+        let key_manager = KEY_MANAGER.read().unwrap();
+        let profile = key_manager.as_ref().unwrap().profile.clone().unwrap();
+        drop(key_manager);
         let key = Encryption::kyber_decrypt(&key.ciphertext, profile.kyber_sk.as_slice())?;
         let data = Encryption::aes_decrypt(&packet.data, &key)?;
-        let (msg_type, data) = data.split_at(1);
-        let data = data.to_vec();
-        let msg_type = MessageType::try_from(msg_type[0] as i32);
-        if msg_type.is_err() {
-            return Err(anyhow!("收到未知消息类型"));
-        }
-        let msg_type = msg_type.unwrap();
-        match msg_type {
-            MessageType::Text => {
-                if !is_history {
-                    Notifier::notify_message(
-                        &packet.sender_name,
-                        &format!("{}", String::from_utf8(data.clone()).unwrap()),
-                    );
-                }
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .sender(TextSpan::new(
-                            packet.sender_name.clone(),
-                            Style::default()
-                                .fg(Color::from_u32(packet.color as u32))
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .plain(String::from_utf8(data).unwrap())
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-            }
-            MessageType::Login => {
-                if !is_history {
-                    Notifier::notify_message(
-                        &packet.sender_name,
-                        &format!("{} 上线了", packet.sender_name),
-                    );
-                }
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .sender(TextSpan::new(
-                            "→",
-                            Style::default()
-                                .fg(Color::Green)
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .colored(
-                            packet.sender_name.clone(),
-                            Color::from_u32(packet.color as u32),
-                        )
-                        .plain(" 上线了")
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-            }
-            MessageType::Logout => {
-                if !is_history {
-                    Notifier::notify_message(
-                        &packet.sender_name,
-                        &format!("{} 下线了", packet.sender_name),
-                    );
-                }
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .sender(TextSpan::new(
-                            "←",
-                            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                        ))
-                        .colored(
-                            packet.sender_name.clone(),
-                            Color::from_u32(packet.color as u32),
-                        )
-                        .plain(" 下线了")
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-                ClientManager::update_status(packet.sender_id.clone(), ClientStatus::Offline);
-            }
-            MessageType::ChangeColor => {
-                let data = ServerBroadcastChangeColor::decode(data.as_slice())?;
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .colored(data.name, Color::from_u32(data.new_color as u32))
-                        .plain(" 的聊天颜色从 ")
-                        .colored(
-                            color_code_to_hex(data.old_color),
-                            Color::from_u32(data.old_color as u32),
-                        )
-                        .plain(" 更改至 ")
-                        .colored(
-                            color_code_to_hex(data.new_color),
-                            Color::from_u32(data.new_color as u32),
-                        )
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-                ClientManager::update_color(data.id.clone(), data.new_color);
-            }
-            MessageType::EnterAfk => {
-                if !is_history {
-                    Notifier::notify_message(
-                        &packet.sender_name,
-                        &format!("{} 进入了AFK状态", packet.sender_name),
-                    );
-                }
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .sender(TextSpan::new(
-                            "\u{f04b2}",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .colored(
-                            packet.sender_name.clone(),
-                            Color::from_u32(packet.color as u32),
-                        )
-                        .plain(" 进入了AFK状态")
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-            }
-            MessageType::LeftAfk => {
-                if !is_history {
-                    Notifier::notify_message(
-                        &packet.sender_name,
-                        &format!("{} 离开了AFK状态", packet.sender_name),
-                    );
-                }
-                add_chat_message_rich(
-                    LineBuilder::new()
-                        .time(packet.timestamp)
-                        .sender(TextSpan::new(
-                            "\u{f04b3}",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ))
-                        .colored(
-                            packet.sender_name.clone(),
-                            Color::from_u32(packet.color as u32),
-                        )
-                        .plain(" 离开了AFK状态")
-                        .build(),
-                    if is_history { Some(0) } else { None },
-                );
-            }
-            _ => {}
-        };
 
-        Ok(())
+        let registry = create_message_registry();
+        let context = MessageContext { is_history };
+        registry.process_message(packet, data, context)
     }
 
     pub fn handle_packet(packet: OrwellPacket, network: &mut Network) -> Result<()> {
-        let mut state = STATE.write().unwrap();
-        state.ratchet_roll_time += 1;
-        drop(state);
-        let type_ = PacketType::try_from(packet.packet_type);
-        if type_.is_err() {
-            return Err(anyhow::anyhow!("收到未知消息类型"));
-        }
-        let type_ = type_.unwrap();
-        match type_ {
-            PacketType::ServerHeartbeat => {
-                network.send_packet(PacketType::ClientHeartbeat, ClientHeartbeat {});
-            }
-            PacketType::ServerPreLogin => {
-                let packet = decode_packet!(packet, ServerPreLogin);
-                let profile = KeyManager::get_profile().unwrap();
-                if packet.version_mismatch {
-                    add_chat_message("服务器版本不匹配，请更新客户端");
-                    return Err(anyhow::anyhow!("服务器版本不匹配，请更新客户端"));
-                }
-                if packet.registered {
-                    add_debug_message(MessageLevel::Info, "正在登录...");
-                    let profile = KeyManager::get_profile().unwrap();
-                    let token = packet.token.unwrap();
-                    let token = Encryption::kyber_decrypt(&token, profile.kyber_sk.as_slice())?;
-
-                    let token_sign = Encryption::dilithium_sign(
-                        token.as_slice(),
-                        profile.dilithium_sk.as_slice(),
-                    )?;
-                    let login_packet = ClientLogin {
-                        token_sign: token_sign,
-                    };
-                    network.send_packet(PacketType::ClientLogin, login_packet);
-                } else {
-                    if !packet.can_register {
-                        return Err(anyhow::anyhow!("服务器已禁止新用户注册"));
-                    }
-                    // user is not registered, lets register
-                    let packet = ClientRegister {
-                        name: profile.name,
-                        dilithium_pk: profile.dilithium_pk,
-                        kyber_pk: profile.kyber_pk,
-                    };
-                    network.send_packet(PacketType::ClientRegister, packet);
-                }
-                clear_chat_messages();
-            }
-            PacketType::ServerRegisterResponse => {
-                let packet = decode_packet!(packet, ServerRegisterResponse);
-                if packet.success {
-                    add_chat_message(format!(
-                        "注册成功, 您的聊天颜色为 {}",
-                        color_code_to_hex(packet.color.unwrap())
-                    ));
-                    let mut state = STATE.write().unwrap();
-                    state.connected = true;
-                    state.start_time = get_now_timestamp();
-                    drop(state);
-                } else {
-                    add_chat_message(format!("注册失败, 原因: {}", packet.message.unwrap()));
-                }
-            }
-            PacketType::ServerLoginResponse => {
-                let packet = decode_packet!(packet, ServerLoginResponse);
-                if packet.success {
-                    add_chat_message("登录成功");
-                    let mut state = STATE.write().unwrap();
-                    state.connected = true;
-                    state.start_time = get_now_timestamp();
-                    drop(state);
-                } else {
-                    add_chat_message(format!("登录失败, 原因: {}", packet.message.unwrap()));
-                }
-            }
-            PacketType::ServerClientInfo => {
-                let packet = decode_packet!(packet, ServerClientInfo);
-                let other_clients = packet.data;
-                for client in other_clients {
-                    OTHER_CLIENTS.write().unwrap().insert(
-                        client.id.clone(),
-                        ClientInfo {
-                            id: client.id.clone(),
-                            name: client.name.clone(),
-                            color: client.color as i32,
-                            kyber_pk: client.kyber_pk,
-                            status: ClientStatus::try_from(client.status as i32).unwrap(),
-                        },
-                    );
-                }
-            }
-            PacketType::ServerBroadcastMessage => {
-                let packet: ServerBroadcastMessage = decode_packet!(packet, ServerBroadcastMessage);
-                Self::handle_message(&packet, false)?;
-            }
-            PacketType::ServerHistoryMessage => {
-                let packet = decode_packet!(packet, ServerHistoryMessage);
-                for message in packet.data {
-                    Self::handle_message(&message, true)?;
-                }
-            }
-            PacketType::ServerChangeColorResponse => {
-                let packet = decode_packet!(packet, ServerChangeColorResponse);
-                match packet.success {
-                    true => {
-                        add_chat_message_rich(
-                            LineBuilder::new()
-                                .plain("更改颜色至 ")
-                                .colored(
-                                    format!("{}", color_code_to_hex(packet.color.unwrap())),
-                                    Color::from_u32(packet.color.unwrap() as u32),
-                                )
-                                .plain(" 成功")
-                                .build(),
-                            None,
-                        );
-                    }
-                    false => {
-                        add_chat_message(format!("更改颜色失败: {}", packet.message.unwrap()));
-                    }
-                }
-            }
-            PacketType::ServerOrwellRatchetStep => {
-                let packet = decode_packet!(packet, OrwellRatchetStep);
-                add_debug_message(MessageLevel::Info, "正在轮换...");
-                network.ratchet_step(packet.ct)?;
-            }
-            _ => {}
-        };
-
+        // 这个方法现在由adapter处理，保留用于向后兼容
         Ok(())
     }
 
