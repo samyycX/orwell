@@ -5,7 +5,6 @@ use crate::{
     message::{add_chat_message_rich, LineBuilder, TextSpan},
     message_adapter::{MessageAdapter, MessageContext},
     notify::Notifier,
-    service::ClientManager,
 };
 
 pub struct LoginMessageAdapter;

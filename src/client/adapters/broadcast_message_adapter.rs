@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use orwell::{
     decode_packet,
     pb::orwell::{OrwellPacket, PacketType, ServerBroadcastMessage},

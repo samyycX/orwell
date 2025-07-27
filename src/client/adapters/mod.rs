@@ -15,7 +15,7 @@ use crate::adapters::{
     pre_login_adapter::PreLoginAdapter, ratchet_step_adapter::RatchetStepAdapter,
     register_response_adapter::RegisterResponseAdapter,
 };
-use crate::packet_adapter::{ClientPacketAdapterRegistry, ClientPacketContext};
+use crate::packet_adapter::ClientPacketAdapterRegistry;
 
 /// Create and register all client packet adapters
 pub fn create_client_registry() -> ClientPacketAdapterRegistry {

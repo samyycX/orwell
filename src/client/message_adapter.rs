@@ -1,13 +1,6 @@
 use anyhow::Result;
 use orwell::pb::orwell::{MessageType, ServerBroadcastMessage};
 
-use crate::message::{add_chat_message_rich, LineBuilder, TextSpan};
-use crate::notify::Notifier;
-use crate::service::ClientManager;
-use orwell::pb::orwell::{ClientStatus, ServerBroadcastChangeColor};
-use orwell::shared::helper::color_code_to_hex;
-use prost::Message as ProstMessage;
-use ratatui::style::{Color, Modifier, Style};
 
 /// Context for message processing
 pub struct MessageContext {

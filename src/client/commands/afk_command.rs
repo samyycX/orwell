@@ -2,7 +2,6 @@ use anyhow::Result;
 
 use crate::{
     command_adapter::{CommandAdapter, CommandContext},
-    message::add_chat_message,
     service::Service,
 };
 

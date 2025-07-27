@@ -4,31 +4,25 @@ use anyhow::{anyhow, Result};
 use color_eyre::owo_colors::OwoColorize;
 use lazy_static::lazy_static;
 use orwell::{
-    decode_packet,
     pb::orwell::{
-        ClientAfk, ClientChangeColor, ClientHeartbeat, ClientLogin, ClientMessage, ClientRegister,
-        ClientStatus, Key, MessageType, OrwellPacket, OrwellRatchetStep, PacketType,
-        ServerBroadcastChangeColor, ServerBroadcastMessage, ServerChangeColorResponse,
-        ServerClientInfo, ServerHistoryMessage, ServerLoginResponse, ServerPreLogin,
-        ServerRegisterResponse,
+        ClientAfk, ClientChangeColor, ClientMessage,
+        ClientStatus, Key, MessageType, OrwellPacket, PacketType, ServerBroadcastMessage,
     },
     shared::{
         encryption::Encryption,
-        helper::{color_code_to_hex, get_now_timestamp},
+        helper::get_now_timestamp,
     },
 };
-use prost::Message as ProstMessage;
 use rand::Rng;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 
 use crate::{
-    key::{KeyManager, KEY_MANAGER},
+    key::KEY_MANAGER,
     message::{
-        add_chat_message, add_chat_message_rich, add_debug_message, clear_chat_messages,
-        LineBuilder, MessageLevel, TextSpan,
+        add_chat_message, add_chat_message_rich, add_debug_message,
+        LineBuilder, MessageLevel,
     },
     network::{Network, NETWORK},
-    notify::Notifier,
     App, STATE,
 };
 

@@ -1,8 +1,7 @@
 use anyhow::Result;
-use ratatui::widgets::Widget;
 
 use crate::{
-    message::{add_chat_message, add_debug_message, MessageLevel},
+    message::add_chat_message,
     App,
 };
 

@@ -12,7 +12,6 @@ use orwell::{
         ClientChangeColor, MessageType, PacketType, ServerBroadcastChangeColor,
         ServerChangeColorResponse,
     },
-    shared::helper::get_now_timestamp,
 };
 use prost::Message;
 

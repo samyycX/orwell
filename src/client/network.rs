@@ -17,10 +17,9 @@ use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 use crate::adapters::create_client_registry;
-use crate::key::{KeyManager, KEY_MANAGER};
+use crate::key::KEY_MANAGER;
 use crate::message::{add_chat_message, add_debug_message, MessageLevel};
-use crate::packet_adapter::{ClientPacketAdapterRegistry, ClientPacketContext};
-use crate::service::Service;
+use crate::packet_adapter::ClientPacketContext;
 use crate::STATE;
 
 lazy_static! {
@@ -238,7 +237,7 @@ impl Network {
                 )?;
 
                 let registry = create_client_registry();
-                let mut context = ClientPacketContext { network: self };
+                let context = ClientPacketContext { network: self };
                 if let Some(adapter) =
                     registry.get(PacketType::try_from(packet.packet_type).unwrap())
                 {

@@ -1,5 +1,4 @@
 use crate::{
-    broadcast_message_from_server,
     client::ClientManager,
     message::MessageManager,
     packet_adapter::{PacketAdapter, PacketContext},

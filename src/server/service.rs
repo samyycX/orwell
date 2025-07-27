@@ -22,7 +22,7 @@ impl Service {
 
         broadcast_message_from_server(
             MessageType::Login,
-            &vec![],
+            &[],
             Some(client.id_.clone()),
             Some(client.name_.clone()),
             Some(client.color_.clone()),
@@ -84,7 +84,7 @@ impl Service {
             ClientManager::remove_connection(conn_id).await;
             broadcast_message_from_server(
                 MessageType::Logout,
-                &vec![],
+                &[],
                 Some(client.id_.clone()),
                 Some(client.name_.clone()),
                 Some(client.color_.clone()),

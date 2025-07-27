@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use orwell::pb::orwell::{OrwellPacket, OrwellSignedPacket, PacketType};
+use orwell::pb::orwell::{OrwellPacket, PacketType};
 
 use crate::{client::ClientInfo, WsSender};
 
