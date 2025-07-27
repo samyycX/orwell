@@ -23,6 +23,12 @@ pub struct MultiInput {
     current_height: u16,
 }
 
+impl Default for MultiInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MultiInput {
     pub fn new() -> Self {
         Self {
@@ -253,7 +259,7 @@ impl MultiInput {
     }
 }
 
-impl<'a> Widget for &'a mut MultiInput {
+impl Widget for &mut MultiInput {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.clone().unwrap_or_else(|| {
             Block::default()

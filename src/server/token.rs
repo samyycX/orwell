@@ -45,9 +45,7 @@ impl TokenManager {
     pub async fn validate_token(conn_id: u32, signed_token: &[u8]) -> Option<TokenAndPk> {
         let mut token_manager = TOKEN_MANAGER.write().await;
         let token = token_manager.tokens.get(&conn_id).cloned();
-        if token.is_none() {
-            return None;
-        }
+        token.as_ref()?;
         let token_and_pk = token.unwrap();
         let result = Encryption::dilithium_verify(&token_and_pk.0, &token_and_pk.1, signed_token);
         token_manager.tokens.remove(&conn_id);

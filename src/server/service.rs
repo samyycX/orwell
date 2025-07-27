@@ -25,7 +25,7 @@ impl Service {
             &[],
             Some(client.id_.clone()),
             Some(client.name_.clone()),
-            Some(client.color_.clone()),
+            Some(client.color_),
             true,
         )
         .await?;
@@ -36,7 +36,7 @@ impl Service {
             let client = client.unwrap_or_default();
             let sender_id = client.id_.clone();
             let sender_name = client.name_.clone();
-            let color = client.color_.clone();
+            let color = client.color_;
             packet.data.push(ServerBroadcastMessage {
                 sender_id,
                 sender_name,
@@ -87,7 +87,7 @@ impl Service {
                 &[],
                 Some(client.id_.clone()),
                 Some(client.name_.clone()),
-                Some(client.color_.clone()),
+                Some(client.color_),
                 true,
             )
             .await?;

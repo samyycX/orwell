@@ -126,7 +126,7 @@ impl ClientManager {
     pub async fn login_client(conn_id: u32, client: Client) -> ClientInfo {
         let mut client_manager = CLIENT_MANAGER.write().await;
         let info = ClientInfo {
-            client: client,
+            client,
             status: ClientStatus::Online,
         };
         client_manager.clients.insert(conn_id, info.clone());
@@ -145,9 +145,7 @@ impl ClientManager {
     pub async fn get_online_client_by_connection(conn_id: u32) -> Option<ClientInfo> {
         let client_manager = CLIENT_MANAGER.read().await;
         let client = client_manager.clients.get(&conn_id);
-        if client.is_none() {
-            return None;
-        };
+        client?;;
         Some(client.unwrap().clone())
     }
 
@@ -164,9 +162,7 @@ impl ClientManager {
     pub async fn get_client_by_connection(conn_id: u32) -> Option<ClientInfo> {
         let client_manager = CLIENT_MANAGER.read().await;
         let client_info = client_manager.clients.get(&conn_id);
-        if client_info.is_none() {
-            return None;
-        }
+        client_info?;
         Some(client_info.unwrap().clone())
     }
 

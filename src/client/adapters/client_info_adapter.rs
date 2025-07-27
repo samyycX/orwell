@@ -27,7 +27,7 @@ impl ClientPacketAdapter for ClientInfoAdapter {
                 name: client.name.clone(),
                 color: client.color as i32,
                 kyber_pk: client.kyber_pk,
-                status: ClientStatus::try_from(client.status as i32).unwrap(),
+                status: ClientStatus::try_from(client.status).unwrap(),
             });
         }
 

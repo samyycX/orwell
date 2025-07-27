@@ -100,12 +100,10 @@ impl App {
                             if let Err(e) = registry.process_command(&message, context) {
                                 add_chat_message(format!("命令执行失败: {}", e));
                             }
+                        } else if let Err(e) = Service::broadcast_message(message) {
+                            add_chat_message(format!("发送失败: {}", e));
                         } else {
-                            if let Err(e) = Service::broadcast_message(message) {
-                                add_chat_message(format!("发送失败: {}", e));
-                            } else {
-                                add_debug_message(MessageLevel::Info, "发送成功");
-                            }
+                            add_debug_message(MessageLevel::Info, "发送成功");
                         }
                         // Clear the input by creating a new MultiInput
                         let mut new_input = MultiInput::new();
@@ -186,15 +184,15 @@ fn run(mut terminal: DefaultTerminal) -> Result<()> {
     if app_guard.is_none() {
         app_guard.replace(App::new());
     }
-    let mut app = app_guard.as_mut().unwrap();
+    let app = app_guard.as_mut().unwrap();
     add_chat_message("W3LC0ME T0 0RW3LL");
     add_chat_message(format!("VERSION={}", get_hash_version()));
-    Service::check_login(&app);
+    Service::check_login(app);
 
     let mut sleep_time = 200;
 
     loop {
-        terminal.draw(|frame| render(frame, &mut app))?;
+        terminal.draw(|frame| render(frame, app))?;
         if event::poll(Duration::from_millis(sleep_time))? {
             match event::read()? {
                 Event::Key(key) => app.handle_key_event(key),
@@ -458,7 +456,7 @@ fn render(frame: &mut Frame, app: &mut App) {
                 format!("[{}] ", level.to_string())
             } else {
                 // Subsequent lines are indented
-                format!("{}", " ".repeat(level_width))
+                " ".repeat(level_width).to_string()
             };
 
             let spans = if i == 0 {
@@ -541,7 +539,7 @@ fn render(frame: &mut Frame, app: &mut App) {
             .for_each(|client| {
                 state_text.push(RatatuiLine::from(vec![
                     Span::styled(
-                        format!("\u{f1eb} "),
+                        "\u{f1eb} ".to_string(),
                         Style::default().fg(match client.status {
                             ClientStatus::Online => Theme::catppuccin().green,
                             ClientStatus::Offline => Theme::catppuccin().red,
@@ -549,7 +547,7 @@ fn render(frame: &mut Frame, app: &mut App) {
                         }),
                     ),
                     Span::styled(
-                        format!("{}", client.name),
+                        client.name.to_string(),
                         Style::default().fg(Theme::catppuccin().lavender),
                     ),
                 ]));
