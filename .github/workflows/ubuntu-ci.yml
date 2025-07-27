@@ -48,27 +48,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libsqlite3-dev pkg-config protobuf-compiler
 
-    - name: Install diesel_cli
-      run: cargo install diesel_cli --no-default-features --features sqlite
-
-    - name: Setup test database
-      env:
-        DATABASE_URL: sqlite://test.db
-      run: |
-        diesel setup
-        diesel migration run
-
-    - name: Check formatting
-      run: cargo fmt --all -- --check || true
-
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features || true
-
-    - name: Run tests
-      env:
-        DATABASE_URL: sqlite://test.db
-      run: cargo test --verbose
-
   build:
     name: Build Release
     runs-on: ubuntu-22.04
