@@ -1,9 +1,6 @@
 use anyhow::Result;
 
-use crate::{
-    message::add_chat_message,
-    App,
-};
+use crate::{message::add_chat_message, App};
 
 /// Context for command processing
 pub struct CommandContext<'a> {

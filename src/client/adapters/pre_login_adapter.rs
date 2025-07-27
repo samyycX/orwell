@@ -42,9 +42,7 @@ impl ClientPacketAdapter for PreLoginAdapter {
                 profile.dilithium_sk.as_slice(),
             )?;
 
-            let login_packet = orwell::pb::orwell::ClientLogin {
-                token_sign,
-            };
+            let login_packet = orwell::pb::orwell::ClientLogin { token_sign };
             context
                 .network
                 .send_packet(PacketType::ClientLogin, login_packet);
