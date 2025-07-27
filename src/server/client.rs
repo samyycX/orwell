@@ -145,7 +145,7 @@ impl ClientManager {
     pub async fn get_online_client_by_connection(conn_id: u32) -> Option<ClientInfo> {
         let client_manager = CLIENT_MANAGER.read().await;
         let client = client_manager.clients.get(&conn_id);
-        client?;;
+        client?;
         Some(client.unwrap().clone())
     }
 

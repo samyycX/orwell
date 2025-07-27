@@ -5,13 +5,10 @@ use color_eyre::owo_colors::OwoColorize;
 use lazy_static::lazy_static;
 use orwell::{
     pb::orwell::{
-        ClientAfk, ClientChangeColor, ClientMessage,
-        ClientStatus, Key, MessageType, OrwellPacket, PacketType, ServerBroadcastMessage,
+        ClientAfk, ClientChangeColor, ClientMessage, ClientStatus, Key, MessageType, OrwellPacket,
+        PacketType, ServerBroadcastMessage,
     },
-    shared::{
-        encryption::Encryption,
-        helper::get_now_timestamp,
-    },
+    shared::{encryption::Encryption, helper::get_now_timestamp},
 };
 use rand::Rng;
 use ratatui::style::{Color, Style};
@@ -19,8 +16,7 @@ use ratatui::style::{Color, Style};
 use crate::{
     key::KEY_MANAGER,
     message::{
-        add_chat_message, add_chat_message_rich, add_debug_message,
-        LineBuilder, MessageLevel,
+        add_chat_message, add_chat_message_rich, add_debug_message, LineBuilder, MessageLevel,
     },
     network::{Network, NETWORK},
     App, STATE,

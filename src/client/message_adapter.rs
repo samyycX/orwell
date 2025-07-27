@@ -1,7 +1,6 @@
 use anyhow::Result;
 use orwell::pb::orwell::{MessageType, ServerBroadcastMessage};
 
-
 /// Context for message processing
 pub struct MessageContext {
     pub is_history: bool,
