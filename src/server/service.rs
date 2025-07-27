@@ -57,7 +57,7 @@ impl Service {
         let infos = ClientManager::get_all_clients()
             .await
             .into_iter()
-            .map(|info| info.to_pb_client_info())
+            .map(|info: crate::client::ClientInfo| info.to_pb_client_info())
             .collect::<Vec<_>>();
 
         for online_client_info in ClientManager::get_all_online_clients().await {
@@ -103,7 +103,7 @@ impl Service {
             .collect::<Vec<_>>();
 
         for online_client_info in ClientManager::get_all_online_clients().await {
-            let conn_id =
+            let conn_id: u32 =
                 ClientManager::get_client_connection_by_id(&online_client_info.client.id_)
                     .await
                     .unwrap();
