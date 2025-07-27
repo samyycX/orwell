@@ -78,8 +78,8 @@ impl MultiInput {
                 new_text.push_str(input);
 
                 // Add text after cursor
-                for i in self.cursor_position..graphemes.len() {
-                    new_text.push_str(graphemes[i]);
+                for grapheme in graphemes.iter().skip(self.cursor_position) {
+                    new_text.push_str(grapheme);
                 }
 
                 *text = new_text;
@@ -367,11 +367,7 @@ impl Widget for &mut MultiInput {
 
                     // Show cursor if this is the cursor line and cursor is visible
                     if is_focused && self.cursor_visible && line_idx == cursor_y as usize {
-                        let cursor_pos = if line_idx == 0 {
-                            prefix_width + cursor_x as usize
-                        } else {
-                            prefix_width + cursor_x as usize
-                        };
+                        let cursor_pos = prefix_width + cursor_x as usize;
                         if cursor_pos < inner_area.width as usize {
                             buf.get_mut(inner_area.x + cursor_pos as u16, current_y)
                                 .set_style(THEME.cursor_style());
