@@ -8,10 +8,7 @@ use hkdf::{
 };
 use lazy_static::lazy_static;
 use pqcrypto_kyber::{kyber1024, kyber1024_decapsulate, kyber1024_encapsulate, kyber1024_keypair};
-use pqcrypto_traits::{
-    kem::{Ciphertext, PublicKey, SecretKey, SharedSecret},
-    sign::PublicKey as SignPublicKey,
-};
+use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use prost::Message;
 use sha2::Sha256;
 use sha3::{Digest, Sha3_512};
@@ -53,6 +50,12 @@ pub struct KyberDoubleRatchet {
     skipped_keys: HashMap<(Vec<u8>, u64), Vec<u8>>,
 }
 
+impl Default for KyberDoubleRatchet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KyberDoubleRatchet {
     pub fn new() -> Self {
         let (pk, sk) = kyber1024_keypair();
@@ -71,14 +74,14 @@ impl KyberDoubleRatchet {
     }
 
     fn hkdf_derive_key(ikm: &[u8], salt: &[u8], info: String, length: usize) -> Vec<u8> {
-        let hk = Hkdf::<Sha256>::new(Some(&salt[..]), &ikm);
+        let hk = Hkdf::<Sha256>::new(Some(salt), ikm);
         let mut okm = vec![0u8; length];
-        hk.expand(&info.as_bytes(), &mut okm).unwrap();
+        hk.expand(info.as_bytes(), &mut okm).unwrap();
         okm
     }
 
     pub fn hmac_sha256(data: &[u8], key: &[u8]) -> Vec<u8> {
-        let mut hmac = <Hmac<Sha256> as KeyInit>::new_from_slice(&key).unwrap();
+        let mut hmac = <Hmac<Sha256> as KeyInit>::new_from_slice(key).unwrap();
         hmac.update(data);
         hmac.finalize().into_bytes().to_vec()
     }
@@ -137,7 +140,7 @@ impl KyberDoubleRatchet {
         let send_shared_secret = kyber1024_decapsulate(&send_ct, &self.kyber_sk);
         let root_key = Self::hkdf_derive_key(
             shared_secret.as_bytes(),
-            &salt,
+            salt,
             "OrwellKDRRootKey".to_string(),
             32,
         );
@@ -263,7 +266,7 @@ impl Encryption {
         let mut salts = SALTS.lock().unwrap();
         let now_timestamp = get_now_timestamp();
 
-        while salts.len() > 0 && (now_timestamp - salts.front().unwrap().timestamp > TIME_LIMIT) {
+        while !salts.is_empty() && (now_timestamp - salts.front().unwrap().timestamp > TIME_LIMIT) {
             salts.pop_front();
         }
 
@@ -334,7 +337,7 @@ impl Encryption {
     }
 
     pub fn hkdf_derive_key(ikm: &[u8], salt: &[u8]) -> Key<Aes256Gcm> {
-        let hk = Hkdf::<Sha256>::new(Some(&salt[..]), &ikm);
+        let hk = Hkdf::<Sha256>::new(Some(salt), ikm);
         let mut okm = [0u8; 32];
         hk.expand(&[0u8; 0], &mut okm).unwrap();
 
@@ -356,7 +359,7 @@ impl Encryption {
 
         let mut result = Vec::new();
         result.extend_from_slice(&salt);
-        result.extend_from_slice(&nonce);
+        result.extend_from_slice(nonce);
         result.extend_from_slice(&encrypted);
         result
     }
@@ -371,7 +374,7 @@ impl Encryption {
         let encrypted = &data[44..];
 
         let nonce = Nonce::from_slice(nonce);
-        let key = Self::hkdf_derive_key(key, &salt);
+        let key = Self::hkdf_derive_key(key, salt);
         let cipher = Aes256Gcm::new(&key);
         let decrypted = cipher
             .decrypt(nonce, encrypted)
@@ -430,7 +433,7 @@ impl Encryption {
         }
         pk_buf.copy_from_slice(pk);
         let pk = dilithium5::PublicKey::from_bytes(&pk_buf);
-        let result = pk.verify(data, &sign);
+        let result = pk.verify(data, sign);
         Ok(result)
     }
 

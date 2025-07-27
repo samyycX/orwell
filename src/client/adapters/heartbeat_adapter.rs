@@ -1,9 +1,7 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use orwell::pb::orwell::{ClientHeartbeat, OrwellPacket, PacketType};
 
 use crate::packet_adapter::{ClientPacketAdapter, ClientPacketContext};
-use prost::Message;
 
 pub struct HeartbeatAdapter;
 

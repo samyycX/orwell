@@ -13,7 +13,6 @@ use orwell::{
 use prost::Message;
 
 use orwell::pb::orwell::MessageType;
-use orwell::shared::helper::get_now_timestamp;
 pub struct AfkAdapter;
 
 #[async_trait]

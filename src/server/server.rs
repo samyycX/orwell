@@ -4,14 +4,13 @@ use diesel::{Connection, SqliteConnection};
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use orwell::{
-    decode_packet,
     pb::orwell::{
         ClientHello, ClientHello2, Key, MessageType, OrwellRatchetPacket, OrwellRatchetStep,
         OrwellSignedPacket, PacketType, ServerBroadcastMessage, ServerHeartbeat, ServerHello,
     },
     shared::{
         encryption::{Encryption, KyberDoubleRatchet, RatchetState},
-        helper::{get_now_timestamp, get_version},
+        helper::get_now_timestamp,
     },
 };
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SharedSecret};
@@ -41,7 +40,6 @@ use crate::{
     message::MessageManager,
     packet_adapter::PacketContext,
     service::Service,
-    token::TokenManager,
 };
 
 use packet_adapter::PacketAdapterRegistry;

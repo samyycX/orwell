@@ -1,5 +1,5 @@
 use crate::{
-    client::{Client, ClientManager},
+    client::ClientManager,
     packet_adapter::{PacketAdapter, PacketContext},
     send_packet,
     service::Service,

@@ -1,13 +1,11 @@
 use anyhow::Result;
-use orwell::shared::helper::get_version;
 use orwell::{
     decode_packet,
-    pb::orwell::{ClientPreLogin, ClientRegister, OrwellPacket, PacketType, ServerPreLogin},
+    pb::orwell::{ClientRegister, OrwellPacket, PacketType, ServerPreLogin},
 };
 
 use crate::key;
 use crate::{
-    key::KeyManager,
     message::{add_chat_message, add_debug_message, clear_chat_messages, MessageLevel},
     packet_adapter::{ClientPacketAdapter, ClientPacketContext},
 };

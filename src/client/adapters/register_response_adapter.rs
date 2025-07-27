@@ -8,7 +8,7 @@ use orwell::{
 use prost::Message;
 
 use crate::{
-    message::{add_chat_message, MessageLevel},
+    message::add_chat_message,
     packet_adapter::{ClientPacketAdapter, ClientPacketContext},
     STATE,
 };

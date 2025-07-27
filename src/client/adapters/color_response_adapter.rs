@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use orwell::shared::helper::color_code_to_hex;
 use orwell::{
     decode_packet,
@@ -12,7 +11,7 @@ use crate::{
     message::{add_chat_message, add_chat_message_rich},
     packet_adapter::{ClientPacketAdapter, ClientPacketContext},
 };
-use ratatui::style::{Color, Style};
+use ratatui::style::Color;
 
 pub struct ColorResponseAdapter;
 
