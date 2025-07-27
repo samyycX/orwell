@@ -94,13 +94,13 @@ jobs:
       run: cargo build --release --bin orwell-client
 
     - name: Upload server artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: orwell-server-ubuntu-22.04
         path: target/release/orwell-server
 
     - name: Upload client artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: orwell-client-ubuntu-22.04
         path: target/release/orwell-client
