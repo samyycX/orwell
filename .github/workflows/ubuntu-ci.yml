@@ -47,7 +47,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libsqlite3-dev pkg-config
+        sudo apt-get install -y libsqlite3-dev pkg-config protobuf-compiler
 
     - name: Install diesel_cli
       run: cargo install diesel_cli --no-default-features --features sqlite
