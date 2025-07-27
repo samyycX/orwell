@@ -43,7 +43,7 @@ impl ClientPacketAdapter for PreLoginAdapter {
             )?;
 
             let login_packet = orwell::pb::orwell::ClientLogin {
-                token_sign: token_sign,
+                token_sign,
             };
             context
                 .network

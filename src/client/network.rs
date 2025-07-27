@@ -83,7 +83,7 @@ impl Network {
 
                 let writer = tokio::spawn(async move {
                     while let Some(cmd) = cmd_rx.recv().await {
-                        add_debug_message(MessageLevel::Info, format!("WS收到命令"));
+                        add_debug_message(MessageLevel::Info, "WS收到命令".to_string());
                         match cmd {
                             NetworkCommand::Send(raw) => {
                                 let result = write.send(Message::Binary(raw.clone().into())).await;

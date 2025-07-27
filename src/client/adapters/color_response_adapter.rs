@@ -29,7 +29,7 @@ impl ClientPacketAdapter for ColorResponseAdapter {
                     LineBuilder::new()
                         .plain("更改颜色至 ")
                         .colored(
-                            format!("{}", color_code_to_hex(packet.color.unwrap())),
+                            color_code_to_hex(packet.color.unwrap()).to_string(),
                             Color::from_u32(packet.color.unwrap() as u32),
                         )
                         .plain(" 成功")

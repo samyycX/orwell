@@ -34,8 +34,7 @@ impl PacketAdapter for ColorAdapter {
 
         if clients
             .iter()
-            .map(|c| c.client.color_ == packet.color && c.client.id_ != client.id_)
-            .any(|x| x)
+            .any(|c| c.client.color_ == packet.color && c.client.id_ != client.id_)
         {
             send_packet(
                 context.conn_id,
@@ -43,7 +42,7 @@ impl PacketAdapter for ColorAdapter {
                 ServerChangeColorResponse {
                     success: false,
                     color: None,
-                    message: Some(format!("已经有用户在使用此颜色")),
+                    message: Some("已经有用户在使用此颜色".to_string()),
                 },
             )
             .await?;

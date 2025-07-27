@@ -59,6 +59,12 @@ pub struct State {
     dilithium_pk: dilithium5::PublicKey,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl State {
     pub fn new() -> Self {
         let keys = dilithium5::Keypair::generate(None);
@@ -99,7 +105,7 @@ async fn broadcast_message_from_server(
         key: None,
         sender_id: sender_id.clone(),
         sender_name: sender_name.clone(),
-        color: color.clone(),
+        color,
         data: encrypted_data.clone(),
         timestamp: get_now_timestamp(),
     };
@@ -310,7 +316,7 @@ async fn handle_connection(
                         drop(connections);
 
                         let mut random_data = vec![];
-                        let mut rng = rand::rngs::OsRng::default();
+                        let mut rng = rand::rngs::OsRng;
                         for _ in 0..rng.gen_range(1024..4096) {
                             random_data.push(rng.gen_range(0..=255));
                         }

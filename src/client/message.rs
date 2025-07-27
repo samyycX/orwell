@@ -121,7 +121,7 @@ impl Line {
     /// Format timestamp based on the given format
     pub fn format_timestamp(&self, format: TimeFormat) -> String {
         let datetime = chrono::DateTime::from_timestamp_millis(self.timestamp as i64)
-            .unwrap_or_else(|| chrono::Utc::now().into());
+            .unwrap_or_else(chrono::Utc::now);
         let utc8_time = datetime.with_timezone(&chrono::FixedOffset::east_opt(8 * 3600).unwrap());
 
         match format {
