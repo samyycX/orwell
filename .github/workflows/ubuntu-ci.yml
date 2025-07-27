@@ -97,13 +97,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: orwell-server-ubuntu-22.04
-        path: target/release/orwell-server
+        path: target/release/server
 
     - name: Upload client artifact
       uses: actions/upload-artifact@v4
       with:
         name: orwell-client-ubuntu-22.04
-        path: target/release/orwell-client
+        path: target/release/client
 
   security-audit:
     name: Security Audit
