@@ -1,0 +1,5 @@
+# Orwell Server Configuration
+port = 1337
+use_tls = false
+cert_key_path = ""
+cert_fullchain_path = ""
