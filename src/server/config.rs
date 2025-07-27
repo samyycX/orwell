@@ -3,10 +3,9 @@ use orwell::shared::config::{Config, ConfigError};
 use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     pub port: Option<u16>,
-    pub use_tls: Option<bool>,
     pub cert_key_path: Option<String>,
     pub cert_fullchain_path: Option<String>,
 }
@@ -21,9 +20,15 @@ impl ServerConfig {
     pub fn port_or_default(&self) -> u16 {
         self.port.unwrap_or(1337)
     }
+}
 
-    pub fn use_tls_or_default(&self) -> bool {
-        self.use_tls.unwrap_or(false)
+impl Default for ServerConfig {
+    fn default() -> Self {
+        ServerConfig {
+            port: Some(1337),
+            cert_key_path: Some(String::new()),
+            cert_fullchain_path: Some(String::new()),
+        }
     }
 }
 
@@ -38,10 +43,6 @@ pub fn get_config() -> ServerConfig {
 
 pub fn get_port() -> u16 {
     get_config().port_or_default()
-}
-
-pub fn get_use_tls() -> bool {
-    get_config().use_tls_or_default()
 }
 
 pub fn get_cert_key_path() -> Option<String> {
