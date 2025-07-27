@@ -51,6 +51,7 @@ enum MessageType {
   Me = 4;
   EnterAfk = 5;
   LeftAfk = 6;
+  Image = 7;
 }
 
 message Profile {

@@ -356,6 +356,7 @@ pub enum MessageType {
     Me = 4,
     EnterAfk = 5,
     LeftAfk = 6,
+    Image = 7,
 }
 impl MessageType {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -371,6 +372,7 @@ impl MessageType {
             Self::Me => "Me",
             Self::EnterAfk => "EnterAfk",
             Self::LeftAfk => "LeftAfk",
+            Self::Image => "Image",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -383,6 +385,7 @@ impl MessageType {
             "Me" => Some(Self::Me),
             "EnterAfk" => Some(Self::EnterAfk),
             "LeftAfk" => Some(Self::LeftAfk),
+            "Image" => Some(Self::Image),
             _ => None,
         }
     }
