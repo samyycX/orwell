@@ -22,7 +22,7 @@ macro_rules! decode_packet {
 }
 
 pub fn color_code_to_hex(color: i32) -> String {
-    format!("#{:06X}", color)
+    format!("#{color:06X}")
 }
 
 pub fn get_version() -> u64 {
