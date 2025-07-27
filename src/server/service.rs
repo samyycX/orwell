@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use orwell::pb::orwell::{
-    Key, MessageType, PacketType, ServerBroadcastMessage,
-    ServerClientInfo, ServerHistoryMessage,
+    Key, MessageType, PacketType, ServerBroadcastMessage, ServerClientInfo, ServerHistoryMessage,
 };
 
 use crate::{

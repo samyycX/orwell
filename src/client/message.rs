@@ -4,7 +4,6 @@ use orwell::shared::helper::get_now_timestamp;
 use ratatui::style::{Color, Style};
 use std::sync::Mutex;
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MessageLevel {
     Info,
