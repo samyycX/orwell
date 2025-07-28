@@ -54,12 +54,12 @@ jobs:
 
     - name: Build server
       run: |
-        source $HOME/.cargo/env
+        . "$HOME/.cargo/env" 
         cargo build --release --bin server
 
     - name: Build client
       run: |
-        source $HOME/.cargo/env
+        . "$HOME/.cargo/env" 
         cargo build --release --bin client
 
     - name: Upload server artifact
@@ -95,14 +95,14 @@ jobs:
       run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        source $HOME/.cargo/env
+        . "$HOME/.cargo/env" 
 
     - name: Install cargo-audit
       run: |
-        source $HOME/.cargo/env
+        . "$HOME/.cargo/env" 
         cargo install cargo-audit
 
     - name: Run security audit
       run: |
-        source $HOME/.cargo/env
+        . "$HOME/.cargo/env" 
         cargo audit
