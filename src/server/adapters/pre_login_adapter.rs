@@ -33,7 +33,7 @@ impl PacketAdapter for PreLoginAdapter {
             let response = ServerPreLogin {
                 registered: false,
                 can_register: false,
-                token: None,
+                token: vec![],
                 version_mismatch: true,
             };
             send_packet(context.conn_id, PacketType::ServerPreLogin, response).await?;
@@ -45,7 +45,7 @@ impl PacketAdapter for PreLoginAdapter {
             ServerPreLogin {
                 registered: false,
                 can_register: true,
-                token: None,
+                token: vec![],
                 version_mismatch: false,
             }
         } else {
@@ -57,7 +57,7 @@ impl PacketAdapter for PreLoginAdapter {
             ServerPreLogin {
                 registered: true,
                 can_register: false,
-                token: Some(token),
+                token: token,
                 version_mismatch: false,
             }
         };

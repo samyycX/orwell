@@ -33,14 +33,14 @@ impl PacketAdapter for RegisterAdapter {
         let response = if client.is_some() {
             ServerRegisterResponse {
                 success: false,
-                color: None,
-                message: Some("您已经注册过了".to_string()),
+                color: 0,
+                message: "您已经注册过了".to_string(),
             }
         } else if ClientManager::is_name_taken(&packet.name) {
             ServerRegisterResponse {
                 success: false,
-                color: None,
-                message: Some("该用户名已被占用".to_string()),
+                color: 0,
+                message: "该用户名已被占用".to_string(),
             }
         } else {
             let color = rand::thread_rng().gen_range(0..0x00FFFFFF);
@@ -53,8 +53,8 @@ impl PacketAdapter for RegisterAdapter {
             registered_client.replace(client);
             ServerRegisterResponse {
                 success: true,
-                color: Some(color),
-                message: Some("注册成功".to_string()),
+                color: color,
+                message: "注册成功".to_string(),
             }
         };
 

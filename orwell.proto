@@ -154,19 +154,19 @@ message ServerHello {
 message ServerPreLogin {
   bool registered = 1;
   bool can_register = 2;
-  optional bytes token = 3;
+  bytes token = 3;
   bool version_mismatch = 4;
 }
 
 message ServerRegisterResponse {
   bool success = 1;
-  optional int32 color = 2;
-  optional string message = 3;
+  int32 color = 2;
+  string message = 3;
 }
 
 message ServerLoginResponse {
   bool success = 1;
-  optional string message = 2;
+  string message = 2;
 }
 
 message ServerClientInfo {
@@ -200,8 +200,8 @@ message ServerHistoryMessage {
 
 message ServerChangeColorResponse {
   bool success = 1;
-  optional int32 color = 2;
-  optional string message = 3;
+  int32 color = 2;
+  string message = 3;
 }
 
 message ServerBroadcastChangeColor {

@@ -32,7 +32,7 @@ impl PacketAdapter for LoginAdapter {
         let response = if token.is_none() {
             ServerLoginResponse {
                 success: false,
-                message: Some("身份校验失败".to_string()),
+                message: "身份校验失败".to_string(),
             }
         } else {
             let pk = token.clone().unwrap().1;
@@ -40,7 +40,7 @@ impl PacketAdapter for LoginAdapter {
             login_client.replace(client);
             ServerLoginResponse {
                 success: true,
-                message: Some("登录成功".to_string()),
+                message: "登录成功".to_string(),
             }
         };
 

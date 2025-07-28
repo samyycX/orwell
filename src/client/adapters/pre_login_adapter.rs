@@ -31,7 +31,7 @@ impl ClientPacketAdapter for PreLoginAdapter {
 
         if packet.registered {
             add_debug_message(MessageLevel::Info, "正在登录...");
-            let token = packet.token.unwrap();
+            let token = packet.token;
             let token = orwell::shared::encryption::Encryption::kyber_decrypt(
                 &token,
                 profile.kyber_sk.as_slice(),

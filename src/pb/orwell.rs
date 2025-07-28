@@ -142,8 +142,8 @@ pub struct ServerPreLogin {
     pub registered: bool,
     #[prost(bool, tag = "2")]
     pub can_register: bool,
-    #[prost(bytes = "vec", optional, tag = "3")]
-    pub token: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(bytes = "vec", tag = "3")]
+    pub token: ::prost::alloc::vec::Vec<u8>,
     #[prost(bool, tag = "4")]
     pub version_mismatch: bool,
 }
@@ -151,17 +151,17 @@ pub struct ServerPreLogin {
 pub struct ServerRegisterResponse {
     #[prost(bool, tag = "1")]
     pub success: bool,
-    #[prost(int32, optional, tag = "2")]
-    pub color: ::core::option::Option<i32>,
-    #[prost(string, optional, tag = "3")]
-    pub message: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, tag = "2")]
+    pub color: i32,
+    #[prost(string, tag = "3")]
+    pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ServerLoginResponse {
     #[prost(bool, tag = "1")]
     pub success: bool,
-    #[prost(string, optional, tag = "2")]
-    pub message: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, tag = "2")]
+    pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ServerClientInfo {
@@ -210,10 +210,10 @@ pub struct ServerHistoryMessage {
 pub struct ServerChangeColorResponse {
     #[prost(bool, tag = "1")]
     pub success: bool,
-    #[prost(int32, optional, tag = "2")]
-    pub color: ::core::option::Option<i32>,
-    #[prost(string, optional, tag = "3")]
-    pub message: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int32, tag = "2")]
+    pub color: i32,
+    #[prost(string, tag = "3")]
+    pub message: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ServerBroadcastChangeColor {

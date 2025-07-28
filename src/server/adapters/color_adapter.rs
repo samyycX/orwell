@@ -41,8 +41,8 @@ impl PacketAdapter for ColorAdapter {
                 PacketType::ServerChangeColorResponse,
                 ServerChangeColorResponse {
                     success: false,
-                    color: None,
-                    message: Some("已经有用户在使用此颜色".to_string()),
+                    color: 0,
+                    message: "已经有用户在使用此颜色".to_string(),
                 },
             )
             .await?;
@@ -70,8 +70,8 @@ impl PacketAdapter for ColorAdapter {
                 PacketType::ServerChangeColorResponse,
                 ServerChangeColorResponse {
                     success: true,
-                    color: Some(packet.color),
-                    message: None,
+                    color: packet.color,
+                    message: "".to_string(),
                 },
             )
             .await?;
