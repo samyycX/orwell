@@ -26,8 +26,9 @@ jobs:
     - name: Install system dependencies
       run: |
         apt-get update
-        apt remove gcc-9 -y
         apt-get install -y sudo curl gcc-10 libpq-dev pkg-config protobuf-compiler build-essential
+        apt remove gcc-9 -y
+        apt-get install -y gcc-10
 
     - name: Install Rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
