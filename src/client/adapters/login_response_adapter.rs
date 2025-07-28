@@ -29,7 +29,7 @@ impl ClientPacketAdapter for LoginResponseAdapter {
             state.start_time = get_now_timestamp();
             drop(state);
         } else {
-            add_chat_message(format!("登录失败, 原因: {}", packet.message.unwrap()));
+            add_chat_message(format!("登录失败, 原因: {}", packet.message));
         }
 
         Ok(())

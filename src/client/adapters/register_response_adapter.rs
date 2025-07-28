@@ -27,14 +27,14 @@ impl ClientPacketAdapter for RegisterResponseAdapter {
         if packet.success {
             add_chat_message(format!(
                 "注册成功, 您的聊天颜色为 {}",
-                orwell::shared::helper::color_code_to_hex(packet.color.unwrap())
+                orwell::shared::helper::color_code_to_hex(packet.color)
             ));
             let mut state = STATE.write().unwrap();
             state.connected = true;
             state.start_time = get_now_timestamp();
             drop(state);
         } else {
-            add_chat_message(format!("注册失败, 原因: {}", packet.message.unwrap()));
+            add_chat_message(format!("注册失败, 原因: {}", packet.message));
         }
 
         Ok(())

@@ -29,8 +29,8 @@ impl ClientPacketAdapter for ColorResponseAdapter {
                     LineBuilder::new()
                         .plain("更改颜色至 ")
                         .colored(
-                            color_code_to_hex(packet.color.unwrap()).to_string(),
-                            Color::from_u32(packet.color.unwrap() as u32),
+                            color_code_to_hex(packet.color).to_string(),
+                            Color::from_u32(packet.color as u32),
                         )
                         .plain(" 成功")
                         .build(),
@@ -38,7 +38,7 @@ impl ClientPacketAdapter for ColorResponseAdapter {
                 );
             }
             false => {
-                add_chat_message(format!("更改颜色失败: {}", packet.message.unwrap()));
+                add_chat_message(format!("更改颜色失败: {}", packet.message));
             }
         }
 
