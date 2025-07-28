@@ -27,7 +27,7 @@ jobs:
       run: |
         apt-get update
         apt remove gcc-9 -y
-        apt-get install -y sudo curl gcc-10 libpq-dev pkg-config protobuf-compiler
+        apt-get install -y sudo curl gcc-10 libpq-dev pkg-config protobuf-compiler build-essential
 
     - name: Install Rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
