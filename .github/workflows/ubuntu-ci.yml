@@ -26,7 +26,12 @@ jobs:
     - name: Install system dependencies
       run: |
         apt-get update
-        apt-get install -y curl build-essential libpq-dev pkg-config protobuf-compiler
+        apt-get install -y software-properties-common
+        add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        apt-get update
+        apt-get install -y curl gcc-10 g++-10 libpq-dev pkg-config protobuf-compiler
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+        update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
 
     - name: Install Rust
       run: |
@@ -89,7 +94,12 @@ jobs:
     - name: Install system dependencies
       run: |
         apt-get update
-        apt-get install -y curl build-essential
+        apt-get install -y software-properties-common
+        add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        apt-get update
+        apt-get install -y curl gcc-10 g++-10
+        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+        update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
 
     - name: Install Rust
       run: |
