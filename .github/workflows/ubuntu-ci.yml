@@ -1,4 +1,4 @@
-name: Ubuntu 22.04 CI
+name: Ubuntu 20.04 CI (glibc 2.31)
 
 on:
   push:
@@ -10,118 +10,99 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-22.04
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Rust
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        components: rustfmt, clippy
-
-    - name: Cache cargo registry
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo index
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Cache cargo build
-      uses: actions/cache@v3
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libsqlite3-dev pkg-config protobuf-compiler
 
   build:
-    name: Build Release
-    runs-on: ubuntu-22.04
-    needs: test
+    name: Build Release (Ubuntu 20.04)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        apt-get update
+        apt-get install -y curl build-essential libpq-dev pkg-config protobuf-compiler
+
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        source $HOME/.cargo/env
 
     - name: Cache cargo registry
       uses: actions/cache@v3
       with:
         path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        key: ubuntu-20.04-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo index
       uses: actions/cache@v3
       with:
         path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+        key: ubuntu-20.04-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache cargo build
       uses: actions/cache@v3
       with:
         path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libpq-dev pkg-config protobuf-compiler
+        key: ubuntu-20.04-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build server
-      run: cargo build --release --bin server
+      run: |
+        source $HOME/.cargo/env
+        cargo build --release --bin server
 
     - name: Build client
-      run: cargo build --release --bin client
+      run: |
+        source $HOME/.cargo/env
+        cargo build --release --bin client
 
     - name: Upload server artifact
       uses: actions/upload-artifact@v4
       with:
-        name: orwell-server-ubuntu-22.04
+        name: orwell-server-ubuntu-20.04
         path: target/release/server
 
     - name: Upload client artifact
       uses: actions/upload-artifact@v4
       with:
-        name: orwell-client-ubuntu-22.04
+        name: orwell-client-ubuntu-20.04
         path: target/release/client
 
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-22.04
-    
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        apt-get update
+        apt-get install -y curl build-essential
+
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        source $HOME/.cargo/env
 
     - name: Install cargo-audit
-      run: cargo install cargo-audit
+      run: |
+        source $HOME/.cargo/env
+        cargo install cargo-audit
 
     - name: Run security audit
-      run: cargo audit
+      run: |
+        source $HOME/.cargo/env
+        cargo audit

@@ -59,7 +59,7 @@ impl Network {
         let (cmd_tx, mut cmd_rx) = async_mpsc::unbounded_channel();
 
         let server_url_cloned = server_url.clone();
-        let msg_tx_cloned = msg_tx.clone();
+        let msg_tx_cloned: mpsc::Sender<Vec<u8>> = msg_tx.clone();
 
         let ws_thread = thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
