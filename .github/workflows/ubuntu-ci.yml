@@ -29,6 +29,10 @@ jobs:
         apt-get install -y sudo curl gcc-10 libpq-dev pkg-config protobuf-compiler build-essential
         apt remove gcc-9 -y
         apt-get install -y gcc-10 g++-10
+        sudo ln -sf /usr/bin/gcc-10 /usr/bin/cc
+        sudo ln -sf /usr/bin/g++-10 /usr/bin/c++
+        sudo ln -sf /usr/bin/gcc-10 /usr/bin/gcc
+        sudo ln -sf /usr/bin/g++-10 /usr/bin/g++
 
     - name: Install Rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
