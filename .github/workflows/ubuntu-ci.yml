@@ -51,9 +51,13 @@ jobs:
 
     - name: Build server
       run: cargo build --release --bin server
+      env:
+        RUSTFLAGS: ""
 
     - name: Build client
       run: cargo build --release --bin client
+      env:
+        RUSTFLAGS: ""
 
     - name: Upload server artifact
       uses: actions/upload-artifact@v4
